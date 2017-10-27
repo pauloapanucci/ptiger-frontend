@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++  -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/ptiger.dir/ptiger-lexer.cc.o CMakeFiles/ptiger.dir/ptiger-token.cc.o CMakeFiles/ptiger.dir/ptiger1.cc.o CMakeFiles/ptiger.dir/ptigerspec.cc.o  -o ptiger 

@@ -102,9 +102,10 @@ TokenPtr Lexer::build_token (){
         // printf("whitespace!\n");
         current_column++;
         continue;
-      case '\t':
+      case '\t' /*|| '\v' || '\r'*/:
         // depend on tab configuration
-        current_column += 8;
+        printf("TEST %d\n", current_char);
+        current_column += 2;
         continue;
       //PUNCT
       case ':':
