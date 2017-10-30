@@ -18,23 +18,20 @@
 
 /* Language-dependent contents of a type.  */
 
-struct GTY (()) lang_type
-{
+struct GTY (()) lang_type {
   char dummy;
 };
 
 /* Language-dependent contents of a decl.  */
 
-struct GTY (()) lang_decl
-{
+struct GTY (()) lang_decl {
   char dummy;
 };
 
 /* Language-dependent contents of an identifier.  This must include a
    tree_identifier.  */
 
-struct GTY (()) lang_identifier
-{
+struct GTY (()) lang_identifier {
   struct tree_identifier common;
 };
 
@@ -43,24 +40,20 @@ struct GTY (()) lang_identifier
 union GTY ((desc ("TREE_CODE (&%h.generic) == IDENTIFIER_NODE"),
 	    chain_next ("CODE_CONTAINS_STRUCT (TREE_CODE (&%h.generic), "
 			"TS_COMMON) ? ((union lang_tree_node *) TREE_CHAIN "
-			"(&%h.generic)) : NULL"))) lang_tree_node
-{
+			"(&%h.generic)) : NULL"))) lang_tree_node {
   union tree_node GTY ((tag ("0"), desc ("tree_node_structure (&%h)"))) generic;
   struct lang_identifier GTY ((tag ("1"))) identifier;
 };
 
 /* We don't use language_function.  */
 
-struct GTY (()) language_function
-{
+struct GTY (()) language_function {
   int dummy;
 };
 
 /* Language hooks.  */
 
-static bool
-ptiger_langhook_init (void)
-{
+static bool ptiger_langhook_init (void) {
   /* NOTE: Newer versions of GCC use only:
            build_common_tree_nodes (false);
      See Eugene's comment in the comments section. */
@@ -74,7 +67,7 @@ ptiger_langhook_init (void)
   return true;
 }
 
-static void ptiger_parse_file (const char *filename){
+static void ptiger_parse_file (const char *filename) {
   FILE *file = fopen (filename, "r");
   if (file == NULL) {
     fatal_error (UNKNOWN_LOCATION, "cannot open filename %s: %m", filename);
@@ -107,25 +100,22 @@ static void ptiger_parse_file (const char *filename){
   fclose (file);
 }
 
-static void ptiger_parse_files (int num_files, const char **files){
+static void ptiger_parse_files (int num_files, const char **files) {
   for (int i = 0; i < num_files; i++) {
     ptiger_parse_file(files[i]);
   }
 }
 
-static void ptiger_langhook_parse_file (void){
+static void ptiger_langhook_parse_file (void) {
   ptiger_parse_files(num_in_fnames, in_fnames);
 }
 
 // static void
-// ptiger_langhook_parse_file (void)
-// {
+// ptiger_langhook_parse_file (void) {
 //   fprintf(stderr, "Hello gccptiger!\n");
 // }
 
-static tree
-ptiger_langhook_type_for_mode (enum machine_mode mode, int unsignedp)
-{
+static tree ptiger_langhook_type_for_mode (enum machine_mode mode, int unsignedp) {
   if (mode == TYPE_MODE (float_type_node))
     return float_type_node;
 
@@ -169,38 +159,27 @@ ptiger_langhook_type_for_mode (enum machine_mode mode, int unsignedp)
   return NULL;
 }
 
-static tree
-ptiger_langhook_type_for_size (unsigned int bits ATTRIBUTE_UNUSED,
-			     int unsignedp ATTRIBUTE_UNUSED)
-{
+static tree ptiger_langhook_type_for_size (unsigned int bits ATTRIBUTE_UNUSED, int unsignedp ATTRIBUTE_UNUSED) {
   gcc_unreachable ();
   return NULL;
 }
 
 /* Record a builtin function.  We just ignore builtin functions.  */
 
-static tree
-ptiger_langhook_builtin_function (tree decl)
-{
+static tree ptiger_langhook_builtin_function (tree decl) {
   return decl;
 }
 
-static bool
-ptiger_langhook_global_bindings_p (void)
-{
+static bool ptiger_langhook_global_bindings_p (void) {
   gcc_unreachable ();
   return true;
 }
 
-static tree
-ptiger_langhook_pushdecl (tree decl ATTRIBUTE_UNUSED)
-{
+static tree ptiger_langhook_pushdecl (tree decl ATTRIBUTE_UNUSED) {
   gcc_unreachable ();
 }
 
-static tree
-ptiger_langhook_getdecls (void)
-{
+static tree ptiger_langhook_getdecls (void) {
   return NULL;
 }
 
