@@ -14,7 +14,7 @@
 #include "langhooks.h"
 #include "langhooks-def.h"
 #include "common/common-target.h"
-#include "ptiger-lexer.h"
+#include "ptiger/ptiger-parser.h"
 
 /* Language-dependent contents of a type.  */
 
@@ -67,53 +67,52 @@ static bool ptiger_langhook_init (void) {
   return true;
 }
 
-static void ptiger_parse_file (const char *filename) {
-  FILE *file = fopen (filename, "r");
-  if (file == NULL) {
-    fatal_error (UNKNOWN_LOCATION, "cannot open filename %s: %m", filename);
-  }
+//static void ptiger_parse_file (const char *filename) {
+//  FILE *file = fopen (filename, "r");
+//  if (file == NULL) {
+//    fatal_error (UNKNOWN_LOCATION, "cannot open filename %s: %m", filename);
+//  }
+//
+//  printf("LEXER ANALYSIS\n");
+//
+//  // Here we would parse our file
+//  Ptiger::Lexer lex (filename, file);
+//
+//  Ptiger::const_TokenPtr tok = lex.peek_token ();
+//  for (;;) {
+//    bool has_text = tok->get_id () == Ptiger::IDENTIFIER
+//      || tok->get_id () == Ptiger::INTEGER_LITERAL
+//      || tok->get_id () == Ptiger::STRING_LITERAL;
+//
+//    location_t loc = tok->get_locus ();
+//
+//    fprintf (stderr, "<id=%s%s, %s, line=%d, col=%d>\n", tok->token_id_to_str (),
+//    has_text ? (std::string(", text=") + tok->get_str ()).c_str () : "",
+//    LOCATION_FILE (loc), LOCATION_LINE (loc), LOCATION_COLUMN (loc));
+//
+//    if (tok->get_id() == Ptiger::END_OF_FILE)
+//    break;
+//
+//    lex.skip_token ();
+//    tok = lex.peek_token ();
+//  }
+//  Ptiger::Parser parser
+//
+//  fclose (file);
+//}
 
-  printf("LEXER ANALYSIS\n");
 
-  // Here we would parse our file
-  Ptiger::Lexer lex (filename, file);
-
-  Ptiger::const_TokenPtr tok = lex.peek_token ();
-  for (;;) {
-    bool has_text = tok->get_id () == Ptiger::IDENTIFIER
-      || tok->get_id () == Ptiger::INTEGER_LITERAL
-      || tok->get_id () == Ptiger::STRING_LITERAL;
-
-    location_t loc = tok->get_locus ();
-
-    fprintf (stderr, "<id=%s%s, %s, line=%d, col=%d>\n", tok->token_id_to_str (),
-    has_text ? (std::string(", text=") + tok->get_str ()).c_str () : "",
-    LOCATION_FILE (loc), LOCATION_LINE (loc), LOCATION_COLUMN (loc));
-
-    if (tok->get_id() == Ptiger::END_OF_FILE)
-    break;
-
-    lex.skip_token ();
-    tok = lex.peek_token ();
-  }
-
-  fclose (file);
-}
-
-static void ptiger_parse_files (int num_files, const char **files) {
-  for (int i = 0; i < num_files; i++) {
-    ptiger_parse_file(files[i]);
-  }
-}
+//
+//static void ptiger_parse_files (int num_files, const char **files) {
+//  for (int i = 0; i < num_files; i++) {
+//    ptiger_parse_file(files[i]);
+//  }
+//}
 
 static void ptiger_langhook_parse_file (void) {
   ptiger_parse_files(num_in_fnames, in_fnames);
 }
 
-// static void
-// ptiger_langhook_parse_file (void) {
-//   fprintf(stderr, "Hello gccptiger!\n");
-// }
 
 static tree ptiger_langhook_type_for_mode (enum machine_mode mode, int unsignedp) {
   if (mode == TYPE_MODE (float_type_node))
