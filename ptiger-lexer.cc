@@ -104,7 +104,6 @@ TokenPtr Lexer::build_token (){
         continue;
       case '\t' /*|| '\v' || '\r'*/:
         // depend on tab configuration
-        printf("TEST %d\n", current_char);
         current_column += 2;
         continue;
       //PUNCT
