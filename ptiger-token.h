@@ -9,7 +9,7 @@
 #include <string>
 #include <tr1/memory>
 
-namespace Ptiger{
+namespace Ptiger {
 
 //PTIGER_TOKEN(name, description)
 //PTIGER_TOKEN_KEYWORD(name, identifier)
@@ -71,85 +71,89 @@ namespace Ptiger{
                                                                                 \
   PTIGER_TOKEN (LAST_TOKEN, "<last-token-marker>")
 
-enum TokenId {
-  #define PTIGER_TOKEN(name, _) name,
-  #define PTIGER_TOKEN_KEYWORD(x, y) PTIGER_TOKEN(x, y)
-    PTIGER_TOKEN_LIST
-  #undef PTIGER_TOKEN_KEYWORD
-  #undef PTIGER_TOKEN
-};
+    enum TokenId {
+#define PTIGER_TOKEN(name, _) name,
+#define PTIGER_TOKEN_KEYWORD(x, y) PTIGER_TOKEN(x, y)
+        PTIGER_TOKEN_LIST
+#undef PTIGER_TOKEN_KEYWORD
+#undef PTIGER_TOKEN
+    };
 
-const char *get_token_description (TokenId tid);
-const char *token_id_to_str (TokenId tid);
+    const char *get_token_description(TokenId tid);
 
-struct Token;
-typedef std::tr1::shared_ptr<Token> TokenPtr;
-typedef std::tr1::shared_ptr<const Token> const_TokenPtr;
+    const char *token_id_to_str(TokenId tid);
 
-struct Token {
-private:
-    TokenId token_id;
-    location_t locus;
-    std::string *str;
+    struct Token;
+    typedef std::tr1::shared_ptr <Token> TokenPtr;
+    typedef std::tr1::shared_ptr<const Token> const_TokenPtr;
 
-    Token (TokenId token_id_, location_t locus_):
-      token_id (token_id_), locus (locus_), str (0) {}
-    Token (TokenId token_id_, location_t locus_, const std::string& str_):
-      token_id (token_id_), locus (locus_), str (new std::string (str_)) {}
+    struct Token {
+    private:
+        TokenId token_id;
+        location_t locus;
+        std::string *str;
 
-    // no default initializer
-    Token ();
-    // don`t copy/assign tokens
-    Token(const Token &);
-    Token &operator=(const Token &);
+        Token(TokenId token_id_, location_t locus_) :
+                token_id(token_id_), locus(locus_), str(0) {}
 
-public:
-  ~Token () { delete str; }
+        Token(TokenId token_id_, location_t locus_, const std::string &str_) :
+                token_id(token_id_), locus(locus_), str(new std::string(str_)) {}
 
-  static TokenPtr make (TokenId token_id, location_t locus) {
-    return TokenPtr(new Token (token_id, locus));
-  }
+        // no default initializer
+        Token();
 
-  static TokenPtr make_identifier (location_t locus, const std::string& str) {
-    return TokenPtr(new Token (IDENTIFIER, locus, str));
-  }
+        // don`t copy/assign tokens
+        Token(const Token &);
 
-  static TokenPtr make_integer (location_t locus, const std::string& str) {
-    return TokenPtr(new Token (INTEGER_LITERAL, locus, str));
-  }
+        Token &operator=(const Token &);
 
-  static TokenPtr make_real (location_t locus, const std::string& str) {
-    return TokenPtr(new Token (REAL_LITERAL, locus, str));
-  }
+    public:
+        ~Token() { delete str; }
 
-  static TokenPtr make_string (location_t locus, const std::string& str) {
-    return TokenPtr(new Token (STRING_LITERAL, locus, str));
-  }
+        static TokenPtr make(TokenId token_id, location_t locus) {
+            return TokenPtr(new Token(token_id, locus));
+        }
 
-  TokenId get_id () const {
-    return token_id;
-  }
+        static TokenPtr make_identifier(location_t locus, const std::string &str) {
+            return TokenPtr(new Token(IDENTIFIER, locus, str));
+        }
 
-  location_t get_locus () const {
-    return locus;
-  }
+        static TokenPtr make_integer(location_t locus, const std::string &str) {
+            return TokenPtr(new Token(INTEGER_LITERAL, locus, str));
+        }
 
-  const std::string & get_str () const {
-    gcc_assert (str != NULL);
-    return *str;
-  }
+        static TokenPtr make_real(location_t locus, const std::string &str) {
+            return TokenPtr(new Token(REAL_LITERAL, locus, str));
+        }
 
-  //diagnostic
-  const char *get_token_description () const {
-    return Ptiger::get_token_description (token_id);
-  }
+        static TokenPtr make_string(location_t locus, const std::string &str) {
+            return TokenPtr(new Token(STRING_LITERAL, locus, str));
+        }
 
-  //debugging
-  const char *token_id_to_str () const {
-    return Ptiger::token_id_to_str (token_id);
-  }
+        TokenId get_id() const {
+            return token_id;
+        }
 
-};
+        location_t get_locus() const {
+            return locus;
+        }
+
+        const std::string &get_str() const {
+            gcc_assert(str != NULL);
+            return *str;
+        }
+
+        //diagnostic
+        const char *get_token_description() const {
+            return Ptiger::get_token_description(token_id);
+        }
+
+        //debugging
+        const char *token_id_to_str() const {
+            return Ptiger::token_id_to_str(token_id);
+        }
+
+    };
 
 } //end namespace
 #endif // PTIGER_TOKEN_H
