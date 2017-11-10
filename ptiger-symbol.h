@@ -20,14 +20,14 @@ namespace Ptiger {
 
     struct Symbol {
     public:
-        Symbol(/*SymbolKind kind, */const std::string &name_) : /*kind(kind),*/ name(name_), decl(error_mark_node) {
+        Symbol(SymbolKind kind, const std::string &name_) : kind(kind), name(name_), decl(error_mark_node) {
             gcc_assert(name.size() > 0);
         }
 
-//        SymbolKind
-//        get_kind() const {
-//            return kind;
-//        }
+       SymbolKind
+       get_kind() const {
+           return kind;
+       }
 
         std::string
         get_name() const {
@@ -47,7 +47,7 @@ namespace Ptiger {
         }
 
     private:
-//        SymbolKind kind;
+       SymbolKind kind;
         std::string name;
         Tree decl;
     };

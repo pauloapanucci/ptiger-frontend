@@ -20,12 +20,17 @@ gccptiger$(exeext): $(GCCPTIGER_OBJS) $(EXTRA_GCC_OBJS) libcommon-target.a $(LIB
 # The compiler proper
 
 ptiger_OBJS = \
-    ptiger/ptiger1.o \
-    ptiger/lib.o \
-    ptiger/ptiger-parser.o \
-    ptiger/ptiger-token.o \
-    ptiger/ptiger-lexer.o \
-    $(END)
+      ptiger/ptiger1.o \
+      ptiger/lib.o \
+      ptiger/ptiger-parser.o \
+      ptiger/ptiger-token.o \
+      ptiger/ptiger-lexer.o \
+      ptiger/ptiger-symbol.o \
+      ptiger/ptiger-symbol-mapping.o \
+      ptiger/ptiger-scope.o \
+      ptiger/ptiger-convert.o \
+      $(END)
+
 
 ptiger1$(exeext): attribs.o $(ptiger_OBJS) $(BACKEND) $(LIBDEPS)
 	+$(LLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
