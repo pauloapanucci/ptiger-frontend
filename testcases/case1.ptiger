@@ -1,5 +1,3 @@
-let
-	var x : int := 10
-in
-	3	
-end
+var x : int := 10
+x := 11
+write x

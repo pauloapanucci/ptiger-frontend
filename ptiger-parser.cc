@@ -1,20 +1,3 @@
-/* Ptiger parser
-Copyright (C) 2016 Free Software Foundation, Inc.
-
-GNU CC is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 3, or (at your option)
-any later version.
-
-GNU CC is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with GCC; see the file COPYING3.  If not see
-<http://www.gnu.org/licenses/>.  */
-
 #include <iostream>
 #include <memory>
 
@@ -63,7 +46,7 @@ namespace Ptiger {
 
         Tree left_denotation(const_TokenPtr tok, Tree left);
 
-        // Tree parse_expression(int right_binding_power);
+        Tree parse_exp(int right_binding_power);
 
         Tree coerce_binary_arithmetic(const_TokenPtr tok, Tree *left, Tree *right);
 
@@ -117,28 +100,27 @@ namespace Ptiger {
 
         BinaryHandler get_binary_handler(TokenId id);
 
-#define BINARY_HANDLER_LIST                                                    \
-      BINARY_HANDLER (plus, PLUS)                                                  \
-      BINARY_HANDLER (minus, MINUS)                                                \
-      BINARY_HANDLER (mult, ASTERISK)                                              \
-      BINARY_HANDLER (div, SLASH)                                                  \
-      BINARY_HANDLER (mod, PERCENT)                                                \
+#define BINARY_HANDLER_LIST \
+      BINARY_HANDLER (plus, PLUS) \
+      BINARY_HANDLER (minus, MINUS) \
+      BINARY_HANDLER (mult, TIMES) \
+      BINARY_HANDLER (div, DIVIDE) \
       \
-      BINARY_HANDLER (equal, EQUAL)                                                \
-      BINARY_HANDLER (different, DIFFERENT)                                        \
-      BINARY_HANDLER (lower_than, LOWER)                                           \
-      BINARY_HANDLER (lower_equal, LOWER_OR_EQUAL)                                 \
-      BINARY_HANDLER (greater_than, GREATER)                                       \
-      BINARY_HANDLER (greater_equal, GREATER_OR_EQUAL)                             \
+      BINARY_HANDLER (equal, EQ) \
+      BINARY_HANDLER (different, NEQ) \
+      BINARY_HANDLER (lower_than, LT) \
+      BINARY_HANDLER (lower_equal, LE) \
+      BINARY_HANDLER (greater_than, GT) \
+      BINARY_HANDLER (greater_equal, GE) \
       \
-      BINARY_HANDLER (logical_and, AND)                                            \
-      BINARY_HANDLER (logical_or, OR)                                              \
+      BINARY_HANDLER (logical_and, AND) \
+      BINARY_HANDLER (logical_or, OR) \
       \
-      BINARY_HANDLER (array_ref, LEFT_SQUARE)                                      \
+      BINARY_HANDLER (array_ref, LBRACK) \
       \
       BINARY_HANDLER (field_ref, DOT)
 
-#define BINARY_HANDLER(name, _)                                                \
+#define BINARY_HANDLER(name, _) \
       Tree binary_##name (const_TokenPtr tok, Tree left);
 
         BINARY_HANDLER_LIST
@@ -150,6 +132,8 @@ namespace Ptiger {
         }
 
         Tree parse_expression();
+
+        Tree parse_exp();
 
         Tree parse_let_expression();
 
@@ -169,11 +153,11 @@ namespace Ptiger {
 
         Tree parse_field_declaration(std::vector <std::string> &field_names);
 
-        Tree parse_assignment_expression_declaration(Tree variable, const_TokenPtr assig_tok);
+        Tree parse_assignment_expression_declaration(Tree var, const_TokenPtr assig_tok);
 
-        Tree parse_assignment_statement();
+        Tree parse_assignment_expression();
 
-        Tree parse_if_statement();
+        Tree parse_if_expression();
 
         Tree parse_while_statement();
 
@@ -186,6 +170,8 @@ namespace Ptiger {
         // Tree parse_expression();
 
         Tree parse_expression_naming_variable();
+
+        Tree parse_expression_naming_variable_declaration(Tree expr);
 
         Tree parse_lhs_assignment_expression();
 
@@ -307,27 +293,23 @@ namespace Ptiger {
         main_fndecl = NULL_TREE;
     }
 
-    bool
-    Parser::done_end_of_file() {
+    bool Parser::done_end_of_file() {
         const_TokenPtr t = lexer.peek_token();
         return (t->get_id() == Ptiger::END_OF_FILE);
     }
 
-    bool
-    Parser::done_end() {
+    bool Parser::done_end() {
         const_TokenPtr t = lexer.peek_token();
         return (t->get_id() == Ptiger::END || t->get_id() == Ptiger::END_OF_FILE);
     }
 
-    // bool
-    // Parser::done_end_or_else() {
-    //     const_TokenPtr t = lexer.peek_token();
-    //     return (t->get_id() == Ptiger::END || t->get_id() == Ptiger::ELSE
-    //             || t->get_id() == Ptiger::END_OF_FILE);
-    // }
+    bool Parser::done_end_or_else() {
+        const_TokenPtr t = lexer.peek_token();
+        return (t->get_id() == Ptiger::END || t->get_id() == Ptiger::ELSE
+                || t->get_id() == Ptiger::END_OF_FILE);
+    }
 
-    void
-    Parser::parse_expression_seq(bool (Parser::*done)()) {
+    void Parser::parse_expression_seq(bool (Parser::*done)()) {
         // Parse statements until done and append to the current stmt list;
         while (!(this->*done)()) {
             Tree expr = parse_expression();
@@ -335,8 +317,7 @@ namespace Ptiger {
         }
     }
 
-    void
-    Parser::enter_scope() {
+    void Parser::enter_scope() {
         scope.push_scope();
 
         TreeStmtList stmt_list;
@@ -346,8 +327,7 @@ namespace Ptiger {
         stack_block_chain.push_back(BlockChain());
     }
 
-    Parser::TreeSymbolMapping
-    Parser::leave_scope() {
+    Parser::TreeSymbolMapping Parser::leave_scope() {
         TreeStmtList current_stmt_list = get_current_stmt_list();
         stack_stmt_list.pop_back();
 
@@ -385,8 +365,7 @@ namespace Ptiger {
         return tree_scope;
     }
 
-    TreeStmtList &
-    Parser::get_current_stmt_list() {
+    TreeStmtList & Parser::get_current_stmt_list() {
         return stack_stmt_list.back();
     }
 
@@ -401,17 +380,21 @@ namespace Ptiger {
         |  write_statement
         */
         const_TokenPtr t = lexer.peek_token();
-
+        // printf("\tTOKEN NO PARSER : %s\n", t->get_token_description());
         switch (t->get_id()) {
+            case Ptiger::WRITE:
+                return parse_write_statement();
+                break;
+            case Ptiger::VAR:
+                return parse_variable_declaration();
+                break;
             case Ptiger::LET:
                 return parse_let_expression();
                 break;
-            case Ptiger::INTEGER_LITERAL:
-                // FIXME : check ranges
-                printf("to parsando um integer literal\n");
-                lexer.skip_token();
-                return Tree(build_int_cst_type(integer_type_node, atoi(t->get_str().c_str())), t->get_locus());
-                break;
+            case Ptiger::IF:
+                return parse_if_expression();
+            case Ptiger::IDENTIFIER:
+                return parse_assignment_expression();
             default:
                 unexpected_token(t);
                 skip_after_semicolon();
@@ -521,9 +504,43 @@ namespace Ptiger {
     //     return stmt;
     // }
 
-    Tree Parser::parse_assignment_expression_declaration(Tree variable, const_TokenPtr assig_tok) {
+    Tree Parser::parse_assignment_expression(){
+      // assignment_statement -> expression ":=" expression ";"
+
+       Tree variable = parse_lhs_assignment_expression ();
+
+       if (variable.is_error ())
+        return Tree::error ();
+
+       const_TokenPtr assig_tok = expect_token (Ptiger::ASSIGN);
+      if (assig_tok == NULL) {
+          skip_after_semicolon ();
+          return Tree::error ();
+      }
+
+      const_TokenPtr first_of_expr = lexer.peek_token ();
+
+      Tree expr = parse_exp ();
+      if (expr.is_error ())
+        return Tree::error ();
+
+      if (variable.get_type () != expr.get_type ()) {
+          error_at (first_of_expr->get_locus (),
+    		"cannot assign value of type %s to a variable of type %s",
+    		print_type (expr.get_type ()),
+    		print_type (variable.get_type ()));
+          return Tree::error ();
+      }
+
+      Tree assig_expr = build_tree (MODIFY_EXPR, assig_tok->get_locus (),
+    				void_type_node, variable, expr);
+
+      return assig_expr;
+    }
+
+    Tree Parser::parse_assignment_expression_declaration(Tree var, const_TokenPtr assig_tok) {
         // assignment_statement -> expression ":=" expression ";"
-        // Tree variable = parse_lhs_assignment_expression();
+        Tree variable = parse_expression_naming_variable_declaration(var);
 
         if (variable.is_error()) return Tree::error();
 
@@ -534,7 +551,7 @@ namespace Ptiger {
         // }
 
         const_TokenPtr first_of_expr = lexer.peek_token();
-        Tree expr = parse_expression();
+        Tree expr = parse_exp();
         if (expr.is_error())
             return Tree::error();
         // skip_token(Ptiger::SEMICOLON);
@@ -549,13 +566,14 @@ namespace Ptiger {
         Tree assig_expr = build_tree(MODIFY_EXPR, assig_tok->get_locus(),
                                      void_type_node, variable, expr);
 
-       lexer.skip_token();
+       // lexer.skip_token();
 
         return assig_expr;
     }
 
     Tree Parser::parse_variable_declaration() {
         // variable_declaration -> "var" identifier ":" type ";"
+
         if (!skip_token(Ptiger::VAR)) {
             skip_after_end();
             return Tree::error();
@@ -566,6 +584,7 @@ namespace Ptiger {
             skip_after_end();
             return Tree::error();
         }
+
 
         // const_TokenPtr t = lexer.peek_token();
         // if (t->get_id() == Ptiger::COLON){
@@ -579,6 +598,7 @@ namespace Ptiger {
             skip_after_end();
             return Tree::error();
         }
+
 
         Tree type_tree = parse_type();
 
@@ -605,20 +625,37 @@ namespace Ptiger {
 
         sym->set_tree_decl(decl);
 
-        const_TokenPtr t = lexer.peek_token();
-        if (t->get_id() == Ptiger::ASSIGN){
-          skip_token(Ptiger::ASSIGN);
-          Tree assign_tree = parse_assignment_expression_declaration(decl, t);
-          if (assign_tree.is_error()) {
+
+        // if (!skip_token(Ptiger::ASSIGN)) {
+        //     skip_after_end();
+        //     return Tree::error();
+        // }
+
+
+        Tree stmt = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
+        get_current_stmt_list().append(stmt);
+
+        // const_TokenPtr t = lexer.peek_token();
+        // if (t->get_id() == Ptiger::ASSIGN){
+        //   skip_token(Ptiger::ASSIGN);
+        //   Tree assign_tree = parse_assignment_expression_declaration(decl, t);
+        //   if (assign_tree.is_error()) {
+        //       skip_after_semicolon();
+        //       return Tree::error();
+        //   }
+        // }
+
+        const_TokenPtr assig_tok = lexer.peek_token();
+        skip_token(Ptiger::ASSIGN);
+        // const_TokenPtr literal = lexer.peek_token();
+        Tree assign_tree = parse_assignment_expression_declaration(decl, assig_tok);
+
+        if (assign_tree.is_error()) {
               skip_after_semicolon();
               return Tree::error();
           }
-        }
 
-        Tree stmt
-                = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
-
-        return stmt;
+        return assign_tree;
     }
 
     // Tree Parser::parse_type_declaration() {
@@ -687,31 +724,27 @@ namespace Ptiger {
       }
     }
 
-    // namespace {
-    //
-    //     bool
-    //     is_string_type(Tree type) {
-    //         gcc_assert(TYPE_P(type.get_tree()));
-    //         return type.get_tree_code() == POINTER_TYPE
-    //                && TYPE_MAIN_VARIANT(TREE_TYPE(type.get_tree())) == char_type_node;
-    //     }
-    //
-    //     bool
-    //     is_array_type(Tree type) {
-    //         gcc_assert(TYPE_P(type.get_tree()));
-    //         return type.get_tree_code() == ARRAY_TYPE;
-    //     }
-    //
-    //     bool
-    //     is_record_type(Tree type) {
-    //         gcc_assert(TYPE_P(type.get_tree()));
-    //         return type.get_tree_code() == RECORD_TYPE;
-    //     }
-    //
-    // }
+    namespace {
 
-    const char *
-    Parser::print_type(Tree type) {
+        bool is_string_type(Tree type) {
+            gcc_assert(TYPE_P(type.get_tree()));
+            return type.get_tree_code() == POINTER_TYPE
+                   && TYPE_MAIN_VARIANT(TREE_TYPE(type.get_tree())) == char_type_node;
+        }
+
+        bool is_array_type(Tree type) {
+            gcc_assert(TYPE_P(type.get_tree()));
+            return type.get_tree_code() == ARRAY_TYPE;
+        }
+
+        bool is_record_type(Tree type) {
+            gcc_assert(TYPE_P(type.get_tree()));
+            return type.get_tree_code() == RECORD_TYPE;
+        }
+
+    }
+
+    const char * Parser::print_type(Tree type) {
         gcc_assert(TYPE_P(type.get_tree()));
 
         if (type == void_type_node) {
@@ -721,13 +754,13 @@ namespace Ptiger {
         } else if (type == float_type_node) {
             return "real";
         }
-        // else if (is_string_type(type)) {
-        //     return "string";
-        // } else if (is_array_type(type)) {
-        //     return "array";
-        // } else if (type == boolean_type_node) {
-        //     return "boolean";
-        // }
+        else if (is_string_type(type)) {
+            return "string";
+        } else if (is_array_type(type)) {
+            return "array";
+        } else if (type == boolean_type_node) {
+            return "boolean";
+        }
         else {
             return "<<unknown-type>>";
         }
@@ -831,15 +864,15 @@ namespace Ptiger {
             //     lexer.skip_token();
             //     type = boolean_type_node;
             //     break;
-            // case Ptiger::IDENTIFIER: {
-            //     SymbolPtr s = query_type(t->get_str(), t->get_locus());
-            //     lexer.skip_token();
-            //     if (s == NULL)
-            //         type = Tree::error();
-            //     else
-            //         type = TREE_TYPE(s->get_tree_decl().get_tree());
-            // }
-            //     break;
+            case Ptiger::IDENTIFIER: {
+                SymbolPtr s = query_type(t->get_str(), t->get_locus());
+                lexer.skip_token();
+                if (s == NULL)
+                    type = Tree::error();
+                else
+                    type = TREE_TYPE(s->get_tree_decl().get_tree());
+            }
+                break;
             // case Ptiger::RECORD:
             //     type = parse_record();
             //     break;
@@ -997,103 +1030,101 @@ namespace Ptiger {
         return t;
     }
 
-    // Tree
-    // Parser::build_if_statement(Tree bool_expr, Tree then_part, Tree else_part) {
-    //     if (bool_expr.is_error())
-    //         return Tree::error();
-    //
-    //     Tree then_label_decl = build_label_decl("then", then_part.get_locus());
-    //
-    //     Tree else_label_decl;
-    //     if (!else_part.is_null())
-    //         else_label_decl = build_label_decl("else", else_part.get_locus());
-    //
-    //     Tree endif_label_decl = build_label_decl("end_if", then_part.get_locus());
-    //
-    //     Tree goto_then = build_tree(GOTO_EXPR, bool_expr.get_locus(),
-    //                                 void_type_node, then_label_decl);
-    //     Tree goto_endif = build_tree(GOTO_EXPR, bool_expr.get_locus(),
-    //                                  void_type_node, endif_label_decl);
-    //
-    //     Tree goto_else_or_endif;
-    //     if (!else_part.is_null())
-    //         goto_else_or_endif = build_tree(GOTO_EXPR, bool_expr.get_locus(),
-    //                                         void_type_node, else_label_decl);
-    //     else
-    //         goto_else_or_endif = goto_endif;
-    //
-    //     TreeStmtList stmt_list;
-    //
-    //     Tree cond_expr
-    //             = build_tree(COND_EXPR, bool_expr.get_locus(), void_type_node, bool_expr,
-    //                          goto_then, goto_else_or_endif);
-    //     stmt_list.append(cond_expr);
-    //
-    //     Tree then_label_expr = build_tree(LABEL_EXPR, then_part.get_locus(),
-    //                                       void_type_node, then_label_decl);
-    //     stmt_list.append(then_label_expr);
-    //
-    //     stmt_list.append(then_part);
-    //
-    //     if (!else_part.is_null()) {
-    //         // Make sure after then part has been executed we go to the end if
-    //         stmt_list.append(goto_endif);
-    //
-    //         Tree else_label_expr = build_tree(LABEL_EXPR, else_part.get_locus(),
-    //                                           void_type_node, else_label_decl);
-    //         stmt_list.append(else_label_expr);
-    //
-    //         stmt_list.append(else_part);
-    //     }
-    //
-    //     // FIXME - location
-    //     Tree endif_label_expr = build_tree(LABEL_EXPR, UNKNOWN_LOCATION,
-    //                                        void_type_node, endif_label_decl);
-    //     stmt_list.append(endif_label_expr);
-    //
-    //     return stmt_list.get_tree();
-    // }
+    Tree Parser::build_if_statement(Tree bool_expr, Tree then_part, Tree else_part) {
+        if (bool_expr.is_error())
+            return Tree::error();
 
-    // Tree
-    // Parser::parse_if_statement() {
-    //     if (!skip_token(Ptiger::IF)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     Tree expr = parse_boolean_expression();
-    //
-    //     skip_token(Ptiger::THEN);
-    //
-    //     enter_scope();
-    //     parse_statement_seq(&Parser::done_end_or_else);
-    //
-    //     TreeSymbolMapping then_tree_scope = leave_scope();
-    //     Tree then_stmt = then_tree_scope.bind_expr;
-    //
-    //     Tree else_stmt;
-    //     const_TokenPtr tok = lexer.peek_token();
-    //     if (tok->get_id() == Ptiger::ELSE) {
-    //         // Consume 'else'
-    //         skip_token(Ptiger::ELSE);
-    //
-    //         enter_scope();
-    //         parse_statement_seq(&Parser::done_end);
-    //         TreeSymbolMapping else_tree_scope = leave_scope();
-    //         else_stmt = else_tree_scope.bind_expr;
-    //
-    //         // Consume 'end'
-    //         skip_token(Ptiger::END);
-    //     } else if (tok->get_id() == Ptiger::END) {
-    //         // Consume 'end'
-    //         skip_token(Ptiger::END);
-    //     } else {
-    //         unexpected_token(tok);
-    //         return Tree::error();
-    //     }
-    //
-    //     return build_if_statement(expr, then_stmt, else_stmt);
-    // }
+        Tree then_label_decl = build_label_decl("then", then_part.get_locus());
+
+        Tree else_label_decl;
+        if (!else_part.is_null())
+            else_label_decl = build_label_decl("else", else_part.get_locus());
+
+        Tree endif_label_decl = build_label_decl("end_if", then_part.get_locus());
+
+        Tree goto_then = build_tree(GOTO_EXPR, bool_expr.get_locus(),
+                                    void_type_node, then_label_decl);
+        Tree goto_endif = build_tree(GOTO_EXPR, bool_expr.get_locus(),
+                                     void_type_node, endif_label_decl);
+
+        Tree goto_else_or_endif;
+        if (!else_part.is_null())
+            goto_else_or_endif = build_tree(GOTO_EXPR, bool_expr.get_locus(),
+                                            void_type_node, else_label_decl);
+        else
+            goto_else_or_endif = goto_endif;
+
+        TreeStmtList stmt_list;
+
+        Tree cond_expr
+                = build_tree(COND_EXPR, bool_expr.get_locus(), void_type_node, bool_expr,
+                             goto_then, goto_else_or_endif);
+        stmt_list.append(cond_expr);
+
+        Tree then_label_expr = build_tree(LABEL_EXPR, then_part.get_locus(),
+                                          void_type_node, then_label_decl);
+        stmt_list.append(then_label_expr);
+
+        stmt_list.append(then_part);
+
+        if (!else_part.is_null()) {
+            // Make sure after then part has been executed we go to the end if
+            stmt_list.append(goto_endif);
+
+            Tree else_label_expr = build_tree(LABEL_EXPR, else_part.get_locus(),
+                                              void_type_node, else_label_decl);
+            stmt_list.append(else_label_expr);
+
+            stmt_list.append(else_part);
+        }
+
+        // FIXME - location
+        Tree endif_label_expr = build_tree(LABEL_EXPR, UNKNOWN_LOCATION,
+                                           void_type_node, endif_label_decl);
+        stmt_list.append(endif_label_expr);
+
+        return stmt_list.get_tree();
+    }
+
+    Tree Parser::parse_if_expression() {
+        if (!skip_token(Ptiger::IF)) {
+            skip_after_end();
+            return Tree::error();
+        }
+        Tree expr = parse_boolean_expression();
+
+        skip_token(Ptiger::THEN);
+
+        enter_scope();
+        parse_expression_seq(&Parser::done_end_or_else);
+
+        TreeSymbolMapping then_tree_scope = leave_scope();
+        Tree then_stmt = then_tree_scope.bind_expr;
+
+        Tree else_stmt;
+        const_TokenPtr tok = lexer.peek_token();
+        if (tok->get_id() == Ptiger::ELSE) {
+            // Consume 'else'
+            skip_token(Ptiger::ELSE);
+
+            enter_scope();
+            parse_expression_seq(&Parser::done_end);
+            TreeSymbolMapping else_tree_scope = leave_scope();
+            else_stmt = else_tree_scope.bind_expr;
+
+            // Consume 'end'
+            // skip_token(Ptiger::END);
+        }
+        // else if (tok->get_id() == Ptiger::END) {
+        //     // Consume 'end'
+        //     skip_token(Ptiger::END);
+        // } else {
+        //     unexpected_token(tok);
+        //     return Tree::error();
+        // }
+
+        return build_if_statement(expr, then_stmt, else_stmt);
+    }
 
     Tree
     Parser::build_let_expression(Tree decl, Tree in_part) {
@@ -1130,8 +1161,7 @@ namespace Ptiger {
         return stmt_list.get_tree();
     }
 
-    Tree
-    Parser::parse_let_expression() {
+    Tree Parser::parse_let_expression() {
         if (!skip_token(Ptiger::LET)) {
             skip_after_end();
             return Tree::error();
@@ -1141,22 +1171,21 @@ namespace Ptiger {
 
         skip_token(Ptiger::IN);
 
-        printf("parsei o IN\n");
-
         enter_scope();
         parse_expression_seq(&Parser::done_end);
 
         TreeSymbolMapping in_tree_scope = leave_scope();
         Tree in_stmt = in_tree_scope.bind_expr;
 
-        const_TokenPtr tok = lexer.peek_token();
-        if (tok->get_id() == Ptiger::END) {
-            // Consume 'end'
-            skip_token(Ptiger::END);
-        } else {
-            unexpected_token(tok);
-            return Tree::error();
-        }
+        skip_token(Ptiger::END);
+        // const_TokenPtr tok = lexer.peek_token();
+        // if (tok->get_id() == Ptiger::END) {
+        //     // Consume 'end'
+        //     skip_token(Ptiger::END);
+        // } else {
+        //     unexpected_token(tok);
+        //     return Tree::error();
+        // }
 
         return build_let_expression(decl, in_stmt);
     }
@@ -1398,663 +1427,638 @@ namespace Ptiger {
     //     return stmt;
     // }
     //
-    // Tree
-    // Parser::get_puts_addr() {
-    //     if (puts_fn.is_null()) {
-    //         tree fndecl_type_param[] = {
-    //                 build_pointer_type(
-    //                         build_qualified_type(char_type_node,
-    //                                              TYPE_QUAL_CONST)) /* const char* */
-    //         };
-    //         tree fndecl_type
-    //                 = build_function_type_array(integer_type_node, 1, fndecl_type_param);
-    //
-    //         tree puts_fn_decl = build_fn_decl("puts", fndecl_type);
-    //         DECL_EXTERNAL(puts_fn_decl) = 1;
-    //
-    //         puts_fn
-    //                 = build1(ADDR_EXPR, build_pointer_type(fndecl_type), puts_fn_decl);
-    //     }
-    //
-    //     return puts_fn;
-    // }
 
-    // Tree
-    // Parser::get_printf_addr() {
-    //     if (printf_fn.is_null()) {
-    //         tree fndecl_type_param[] = {
-    //                 build_pointer_type(
-    //                         build_qualified_type(char_type_node,
-    //                                              TYPE_QUAL_CONST)) /* const char* */
-    //         };
-    //         tree fndecl_type
-    //                 = build_varargs_function_type_array(integer_type_node, 1,
-    //                                                     fndecl_type_param);
-    //
-    //         tree printf_fn_decl = build_fn_decl("printf", fndecl_type);
-    //         DECL_EXTERNAL(printf_fn_decl) = 1;
-    //
-    //         printf_fn
-    //                 = build1(ADDR_EXPR, build_pointer_type(fndecl_type), printf_fn_decl);
-    //     }
-    //
-    //     return printf_fn;
-    // }
-    //
-    // Tree
-    // Parser::parse_write_statement() {
-    //     // write_statement -> "write" expression ";"
-    //
-    //     if (!skip_token(Ptiger::WRITE)) {
-    //         skip_after_semicolon();
-    //         return Tree::error();
-    //     }
-    //
-    //     const_TokenPtr first_of_expr = lexer.peek_token();
-    //     Tree expr = parse_expression();
-    //
-    //     skip_token(Ptiger::SEMICOLON);
-    //
-    //     if (expr.is_error())
-    //         return Tree::error();
-    //
-    //     if (expr.get_type() == integer_type_node) {
-    //         // printf("%d\n", expr)
-    //         const char *format_integer = "%d\n";
-    //         tree args[]
-    //                 = {build_string_literal(strlen(format_integer) + 1, format_integer),
-    //                    expr.get_tree()};
-    //
-    //         Tree printf_fn = get_printf_addr();
-    //
-    //         tree stmt
-    //                 = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
-    //                                        printf_fn.get_tree(), 2, args);
-    //
-    //         return stmt;
-    //     } else if (expr.get_type() == float_type_node) {
-    //         // printf("%f\n", (double)expr)
-    //         const char *format_float = "%f\n";
-    //         tree args[]
-    //                 = {build_string_literal(strlen(format_float) + 1, format_float),
-    //                    convert(double_type_node, expr.get_tree())};
-    //
-    //         Tree printf_fn = get_printf_addr();
-    //
-    //         tree stmt
-    //                 = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
-    //                                        printf_fn.get_tree(), 2, args);
-    //
-    //         return stmt;
-    //     } else if (is_string_type(expr.get_type())) {
-    //         // Alternatively we could use printf('%s\n', expr) instead of puts(expr)
-    //         tree args[] = {expr.get_tree()};
-    //
-    //         Tree puts_fn = get_puts_addr();
-    //
-    //         tree stmt
-    //                 = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
-    //                                        puts_fn.get_tree(), 1, args);
-    //         return stmt;
-    //     } else {
-    //         error_at(first_of_expr->get_locus(),
-    //                  "value of type %s is not a valid write operand",
-    //                  print_type(expr.get_type()));
-    //         return Tree::error();
-    //     }
-    //
-    //     gcc_unreachable();
-    // }
+// ---------------- BEGINWRITE-------------------------
+    Tree Parser::get_puts_addr() {
+        if (puts_fn.is_null()) {
+            tree fndecl_type_param[] = {
+                    build_pointer_type(
+                            build_qualified_type(char_type_node,
+                                                 TYPE_QUAL_CONST)) /* const char* */
+            };
+            tree fndecl_type
+                    = build_function_type_array(integer_type_node, 1, fndecl_type_param);
 
+            tree puts_fn_decl = build_fn_decl("puts", fndecl_type);
+            DECL_EXTERNAL(puts_fn_decl) = 1;
+
+            puts_fn
+                    = build1(ADDR_EXPR, build_pointer_type(fndecl_type), puts_fn_decl);
+        }
+
+        return puts_fn;
+    }
+
+    Tree Parser::get_printf_addr() {
+        if (printf_fn.is_null()) {
+            tree fndecl_type_param[] = {
+                    build_pointer_type(
+                            build_qualified_type(char_type_node,
+                                                 TYPE_QUAL_CONST)) /* const char* */
+            };
+            tree fndecl_type
+                    = build_varargs_function_type_array(integer_type_node, 1,
+                                                        fndecl_type_param);
+
+            tree printf_fn_decl = build_fn_decl("printf", fndecl_type);
+            DECL_EXTERNAL(printf_fn_decl) = 1;
+
+            printf_fn
+                    = build1(ADDR_EXPR, build_pointer_type(fndecl_type), printf_fn_decl);
+        }
+
+        return printf_fn;
+    }
+
+    Tree Parser::parse_write_statement() {
+        // write_statement -> "write" expression ";"
+        if (!skip_token(Ptiger::WRITE)) {
+            skip_after_semicolon();
+            return Tree::error();
+        }
+
+        const_TokenPtr first_of_expr = lexer.peek_token();
+        Tree expr = parse_exp();
+
+
+        // skip_token(Ptiger::SEMICOLON);
+
+        if (expr.is_error())
+            return Tree::error();
+
+        if (expr.get_type() == integer_type_node) {
+            // printf("%d\n", expr)
+            const char *format_integer = "%d\n";
+            tree args[]
+                    = {build_string_literal(strlen(format_integer) + 1, format_integer),
+                       expr.get_tree()};
+
+            Tree printf_fn = get_printf_addr();
+
+            tree stmt
+                    = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
+                                           printf_fn.get_tree(), 2, args);
+
+            return stmt;
+        } else if (expr.get_type() == float_type_node) {
+            // printf("%f\n", (double)expr)
+            const char *format_float = "%f\n";
+            tree args[]
+                    = {build_string_literal(strlen(format_float) + 1, format_float),
+                       convert(double_type_node, expr.get_tree())};
+
+            Tree printf_fn = get_printf_addr();
+
+            tree stmt
+                    = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
+                                           printf_fn.get_tree(), 2, args);
+            return stmt;
+        } else if (is_string_type(expr.get_type())) {
+            // Alternatively we could use printf('%s\n', expr) instead of puts(expr)
+            tree args[] = {expr.get_tree()};
+
+            Tree puts_fn = get_puts_addr();
+
+            tree stmt
+                    = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
+                                           puts_fn.get_tree(), 1, args);
+            return stmt;
+        } else {
+            error_at(first_of_expr->get_locus(),
+                     "value of type %s is not a valid write operand",
+                     print_type(expr.get_type()));
+            return Tree::error();
+        }
+        gcc_unreachable();
+    }
+// ---------------- ENDWRITE-------------------------
     // This is a Pratt parser
+    Tree Parser::parse_exp(int right_binding_power) {
+        const_TokenPtr current_token = lexer.peek_token();
+        lexer.skip_token();
+
+        Tree expr = null_denotation(current_token);
+
+        if (expr.is_error())
+            return Tree::error();
+
+        while (right_binding_power < left_binding_power(lexer.peek_token())) {
+            current_token = lexer.peek_token();
+            lexer.skip_token();
+
+            expr = left_denotation(current_token, expr);
+            if (expr.is_error())
+                return Tree::error();
+        }
+
+        return expr;
+    }
+
+    namespace {
+        enum binding_powers {
+            // Highest priority
+            LBP_HIGHEST = 100,
+
+            LBP_DOT = 90,
+
+            LBP_ARRAY_REF = 80,
+
+            LBP_UNARY_PLUS = 50,  // Used only when the null denotation is +
+            LBP_UNARY_MINUS = LBP_UNARY_PLUS, // Used only when the null denotation is -
+
+            LBP_MUL = 40,
+            LBP_DIV = LBP_MUL,
+            LBP_MOD = LBP_MUL,
+
+            LBP_PLUS = 30,
+            LBP_MINUS = LBP_PLUS,
+
+            LBP_EQUAL = 20,
+            LBP_DIFFERENT = LBP_EQUAL,
+            LBP_LOWER_THAN = LBP_EQUAL,
+            LBP_LOWER_EQUAL = LBP_EQUAL,
+            LBP_GREATER_THAN = LBP_EQUAL,
+            LBP_GREATER_EQUAL = LBP_EQUAL,
+
+            LBP_LOGICAL_AND = 10,
+            LBP_LOGICAL_OR = LBP_LOGICAL_AND,
+            LBP_LOGICAL_NOT = LBP_LOGICAL_AND,
+
+            // Lowest priority
+                    LBP_LOWEST = 0,
+        };
+    }
+
+    // This implements priorities
+    int Parser::left_binding_power(const_TokenPtr token) {
+        switch (token->get_id()) {
+            case Ptiger::DOT:
+                return LBP_DOT;
+
+            case Ptiger::LBRACK:
+                return LBP_ARRAY_REF;
+
+            case Ptiger::TIMES:
+                return LBP_MUL;
+            case Ptiger::DIVIDE:
+                return LBP_DIV;
+
+            case Ptiger::PLUS:
+                return LBP_PLUS;
+            case Ptiger::MINUS:
+                return LBP_MINUS;
+
+            case Ptiger::EQ:
+                return LBP_EQUAL;
+            case Ptiger::NEQ:
+                return LBP_DIFFERENT;
+            case Ptiger::GT:
+                return LBP_GREATER_THAN;
+            case Ptiger::GE:
+                return LBP_GREATER_EQUAL;
+            case Ptiger::LT:
+                return LBP_LOWER_THAN;
+            case Ptiger::LE:
+                return LBP_LOWER_EQUAL;
+                //
+            case Ptiger::OR:
+                return LBP_LOGICAL_OR;
+            case Ptiger::AND:
+                return LBP_LOGICAL_AND;
+                // Anything that cannot appear after a left operand
+                // is considered a terminator
+            default:
+                return LBP_LOWEST;
+        }
+    }
+
+    // This is invoked when a token (including prefix operands) is found at a
+    // "prefix" position
+    Tree Parser::null_denotation(const_TokenPtr tok) {
+        switch (tok->get_id()) {
+            case Ptiger::IDENTIFIER: {
+                SymbolPtr s = query_variable(tok->get_str(), tok->get_locus());
+                if (s == NULL)
+                    return Tree::error();
+                return Tree(s->get_tree_decl(), tok->get_locus());
+            }
+            case Ptiger::INTEGER_LITERAL:
+                // FIXME : check ranges
+                return Tree(build_int_cst_type(integer_type_node,
+                                               atoi(tok->get_str().c_str())),
+                            tok->get_locus());
+                break;
+            case Ptiger::REAL_LITERAL: {
+                REAL_VALUE_TYPE real_value;
+                real_from_string3(&real_value, tok->get_str().c_str(),
+                                  TYPE_MODE(float_type_node));
+
+                return Tree(build_real(float_type_node, real_value),
+                            tok->get_locus());
+            }
+                break;
+            case Ptiger::STRING_LITERAL: {
+                std::string str = tok->get_str();
+                const char *c_str = str.c_str();
+                return Tree(build_string_literal(::strlen(c_str) + 1, c_str),
+                            tok->get_locus());
+            }
+                break;
+            // case Ptiger::TRUE_LITERAL : {
+            //     return Tree(build_int_cst_type(boolean_type_node, 1),
+            //                 tok->get_locus());
+            // }
+            //     break;
+            // case Ptiger::FALSE_LITERAL : {
+            //     return Tree(build_int_cst_type(boolean_type_node, 0),
+            //                 tok->get_locus());
+            // }
+                break;
+            case Ptiger::LPAREN: {
+                Tree expr = parse_exp();
+                tok = lexer.peek_token();
+                if (tok->get_id() != Ptiger::RPAREN)
+                    error_at(tok->get_locus(), "expecting ) but %s found\n",
+                             tok->get_token_description());
+                else
+                    lexer.skip_token();
+                return Tree(expr, tok->get_locus());
+            }
+            case Ptiger::PLUS: {
+                Tree expr = parse_exp(LBP_UNARY_PLUS);
+                if (expr.is_error())
+                    return Tree::error();
+                if (expr.get_type() != integer_type_node
+                    || expr.get_type() != float_type_node) {
+                    error_at(tok->get_locus(),
+                             "operand of unary plus must be int or float but it is %s",
+                             print_type(expr.get_type()));
+                    return Tree::error();
+                }
+                return Tree(expr, tok->get_locus());
+            }
+            case Ptiger::MINUS: {
+                Tree expr = parse_exp(LBP_UNARY_MINUS);
+                if (expr.is_error())
+                    return Tree::error();
+
+                if (expr.get_type() != integer_type_node
+                    || expr.get_type() != float_type_node) {
+                    error_at(
+                            tok->get_locus(),
+                            "operand of unary minus must be int or float but it is %s",
+                            print_type(expr.get_type()));
+                    return Tree::error();
+                }
+
+                expr
+                        = build_tree(NEGATE_EXPR, tok->get_locus(), expr.get_type(), expr);
+                return expr;
+            }
+            // case Ptiger::NOT: {
+            //     Tree expr = parse_expression(LBP_LOGICAL_NOT);
+            //     if (expr.is_error())
+            //         return Tree::error();
+            //
+            //     if (expr.get_type() != boolean_type_node) {
+            //         error_at(tok->get_locus(),
+            //                  "operand of logical not must be a boolean but it is %s",
+            //                  print_type(expr.get_type()));
+            //         return Tree::error();
+            //     }
+            //
+            //     expr = build_tree(TRUTH_NOT_EXPR, tok->get_locus(), boolean_type_node,
+            //                       expr);
+            //     return expr;
+            // }
+            default:
+                unexpected_token(tok);
+                return Tree::error();
+        }
+    }
+
+    Tree Parser::coerce_binary_arithmetic(const_TokenPtr tok, Tree *left, Tree *right) {
+        Tree left_type = left->get_type();
+        Tree right_type = right->get_type();
+
+        if (left_type.is_error() || right_type.is_error())
+            return Tree::error();
+
+        if (left_type == right_type) {
+            if (left_type == integer_type_node || left_type == float_type_node) {
+                return left_type;
+            }
+        } else if ((left_type == integer_type_node && right_type == float_type_node)
+                   || (left_type == float_type_node && right_type == integer_type_node)) {
+            // We will coerce the integer into a float
+            if (left_type == integer_type_node) {
+                *left = build_tree(FLOAT_EXPR, left->get_locus(), float_type_node,
+                                   left->get_tree());
+            } else {
+                *right = build_tree(FLOAT_EXPR, right->get_locus(),
+                                    float_type_node, right->get_tree());
+            }
+            return float_type_node;
+        }
+
+        // i.e. int + boolean
+        error_at(tok->get_locus(),
+                 "invalid operands of type %s and %s for operator %s",
+                 print_type(left_type), print_type(right_type),
+                 tok->get_token_description());
+        return Tree::error();
+    }
+
+    Parser::BinaryHandler
+    Parser::get_binary_handler(TokenId id) {
+        switch (id) {
+#define BINARY_HANDLER(name, token_id)                                         \
+                                                case Ptiger::token_id:                                                         \
+                                                return &Parser::binary_##name;
+            BINARY_HANDLER_LIST
+#undef BINARY_HANDLER
+            default:
+                return NULL;
+        }
+    }
+
+    Tree
+    Parser::binary_plus(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_PLUS);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(PLUS_EXPR, tok->get_locus(), tree_type, left, right);
+    }
+
+    Tree
+    Parser::binary_minus(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_MINUS);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(MINUS_EXPR, tok->get_locus(), tree_type, left, right);
+    }
+
+    Tree
+    Parser::binary_mult(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_MUL);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(MULT_EXPR, tok->get_locus(), tree_type, left, right);
+    }
+
+    Tree
+    Parser::binary_div(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_DIV);
+        if (right.is_error())
+            return Tree::error();
+
+        if (left.get_type() == integer_type_node
+            && right.get_type() == integer_type_node) {
+            // Integer division (truncating, like in C)
+            return build_tree(TRUNC_DIV_EXPR, tok->get_locus(), integer_type_node,
+                              left, right);
+        } else {
+            // Real division
+            Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+            if (tree_type.is_error())
+                return Tree::error();
+
+            gcc_assert(tree_type == float_type_node);
+
+            return build_tree(RDIV_EXPR, tok->get_locus(), tree_type, left, right);
+        }
+    }
+
     // Tree
-    // Parser::parse_expression(int right_binding_power) {
-    //     const_TokenPtr current_token = lexer.peek_token();
-    //     lexer.skip_token();
-    //
-    //     Tree expr = null_denotation(current_token);
-    //
-    //     if (expr.is_error())
+    // Parser::binary_mod(const_TokenPtr tok, Tree left) {
+    //     Tree right = parse_exp(LBP_MOD);
+    //     if (right.is_error())
     //         return Tree::error();
     //
-    //     while (right_binding_power < left_binding_power(lexer.peek_token())) {
-    //         current_token = lexer.peek_token();
-    //         lexer.skip_token();
-    //
-    //         expr = left_denotation(current_token, expr);
-    //         if (expr.is_error())
-    //             return Tree::error();
+    //     if (left.get_type() == integer_type_node
+    //         && right.get_type() == integer_type_node) {
+    //         // Integer division (truncating, like in C)
+    //         return build_tree(TRUNC_MOD_EXPR, tok->get_locus(), integer_type_node,
+    //                           left, right);
+    //     } else {
+    //         error_at(tok->get_locus(),
+    //                  "operands of modulus must be of integer type");
+    //         return Tree::error();
     //     }
-    //
-    //     return expr;
     // }
 
-//     namespace {
-//         enum binding_powers {
-//             // Highest priority
-//                     LBP_HIGHEST = 100,
-//
-//             LBP_DOT = 90,
-//
-//             LBP_ARRAY_REF = 80,
-//
-//             LBP_UNARY_PLUS = 50,  // Used only when the null denotation is +
-//             LBP_UNARY_MINUS = LBP_UNARY_PLUS, // Used only when the null denotation is -
-//
-//             LBP_MUL = 40,
-//             LBP_DIV = LBP_MUL,
-//             LBP_MOD = LBP_MUL,
-//
-//             LBP_PLUS = 30,
-//             LBP_MINUS = LBP_PLUS,
-//
-//             LBP_EQUAL = 20,
-//             LBP_DIFFERENT = LBP_EQUAL,
-//             LBP_LOWER_THAN = LBP_EQUAL,
-//             LBP_LOWER_EQUAL = LBP_EQUAL,
-//             LBP_GREATER_THAN = LBP_EQUAL,
-//             LBP_GREATER_EQUAL = LBP_EQUAL,
-//
-//             LBP_LOGICAL_AND = 10,
-//             LBP_LOGICAL_OR = LBP_LOGICAL_AND,
-//             LBP_LOGICAL_NOT = LBP_LOGICAL_AND,
-//
-//             // Lowest priority
-//                     LBP_LOWEST = 0,
-//         };
-//     }
-//
-//     // This implements priorities
-//     int
-//     Parser::left_binding_power(const_TokenPtr token) {
-//         switch (token->get_id()) {
-//             case Ptiger::DOT:
-//                 return LBP_DOT;
-//                 //
-//             case Ptiger::LEFT_SQUARE:
-//                 return LBP_ARRAY_REF;
-//                 //
-//             case Ptiger::ASTERISK:
-//                 return LBP_MUL;
-//             case Ptiger::SLASH:
-//                 return LBP_DIV;
-//             case Ptiger::PERCENT:
-//                 return LBP_MOD;
-//                 //
-//             case Ptiger::PLUS:
-//                 return LBP_PLUS;
-//             case Ptiger::MINUS:
-//                 return LBP_MINUS;
-//                 //
-//             case Ptiger::EQUAL:
-//                 return LBP_EQUAL;
-//             case Ptiger::DIFFERENT:
-//                 return LBP_DIFFERENT;
-//             case Ptiger::GREATER:
-//                 return LBP_GREATER_THAN;
-//             case Ptiger::GREATER_OR_EQUAL:
-//                 return LBP_GREATER_EQUAL;
-//             case Ptiger::LOWER:
-//                 return LBP_LOWER_THAN;
-//             case Ptiger::LOWER_OR_EQUAL:
-//                 return LBP_LOWER_EQUAL;
-//                 //
-//             case Ptiger::OR:
-//                 return LBP_LOGICAL_OR;
-//             case Ptiger::AND:
-//                 return LBP_LOGICAL_AND;
-//             case Ptiger::NOT:
-//                 return LBP_LOGICAL_NOT;
-//                 // Anything that cannot appear after a left operand
-//                 // is considered a terminator
-//             default:
-//                 return LBP_LOWEST;
-//         }
-//     }
-//
-//     // This is invoked when a token (including prefix operands) is found at a
-//     // "prefix" position
-//     Tree
-//     Parser::null_denotation(const_TokenPtr tok) {
-//         switch (tok->get_id()) {
-//             case Ptiger::IDENTIFIER: {
-//                 SymbolPtr s = query_variable(tok->get_str(), tok->get_locus());
-//                 if (s == NULL)
-//                     return Tree::error();
-//                 return Tree(s->get_tree_decl(), tok->get_locus());
-//             }
-//             case Ptiger::INTEGER_LITERAL:
-//                 // FIXME : check ranges
-//                 return Tree(build_int_cst_type(integer_type_node,
-//                                                atoi(tok->get_str().c_str())),
-//                             tok->get_locus());
-//                 break;
-//             case Ptiger::REAL_LITERAL: {
-//                 REAL_VALUE_TYPE real_value;
-//                 real_from_string3(&real_value, tok->get_str().c_str(),
-//                                   TYPE_MODE(float_type_node));
-//
-//                 return Tree(build_real(float_type_node, real_value),
-//                             tok->get_locus());
-//             }
-//                 break;
-//             case Ptiger::STRING_LITERAL: {
-//                 std::string str = tok->get_str();
-//                 const char *c_str = str.c_str();
-//                 return Tree(build_string_literal(::strlen(c_str) + 1, c_str),
-//                             tok->get_locus());
-//             }
-//                 break;
-//             case Ptiger::TRUE_LITERAL : {
-//                 return Tree(build_int_cst_type(boolean_type_node, 1),
-//                             tok->get_locus());
-//             }
-//                 break;
-//             case Ptiger::FALSE_LITERAL : {
-//                 return Tree(build_int_cst_type(boolean_type_node, 0),
-//                             tok->get_locus());
-//             }
-//                 break;
-//             case Ptiger::LEFT_PAREN: {
-//                 Tree expr = parse_expression();
-//                 tok = lexer.peek_token();
-//                 if (tok->get_id() != Ptiger::RIGHT_PAREN)
-//                     error_at(tok->get_locus(), "expecting ) but %s found\n",
-//                              tok->get_token_description());
-//                 else
-//                     lexer.skip_token();
-//                 return Tree(expr, tok->get_locus());
-//             }
-//             case Ptiger::PLUS: {
-//                 Tree expr = parse_expression(LBP_UNARY_PLUS);
-//                 if (expr.is_error())
-//                     return Tree::error();
-//                 if (expr.get_type() != integer_type_node
-//                     || expr.get_type() != float_type_node) {
-//                     error_at(tok->get_locus(),
-//                              "operand of unary plus must be int or float but it is %s",
-//                              print_type(expr.get_type()));
-//                     return Tree::error();
-//                 }
-//                 return Tree(expr, tok->get_locus());
-//             }
-//             case Ptiger::MINUS: {
-//                 Tree expr = parse_expression(LBP_UNARY_MINUS);
-//                 if (expr.is_error())
-//                     return Tree::error();
-//
-//                 if (expr.get_type() != integer_type_node
-//                     || expr.get_type() != float_type_node) {
-//                     error_at(
-//                             tok->get_locus(),
-//                             "operand of unary minus must be int or float but it is %s",
-//                             print_type(expr.get_type()));
-//                     return Tree::error();
-//                 }
-//
-//                 expr
-//                         = build_tree(NEGATE_EXPR, tok->get_locus(), expr.get_type(), expr);
-//                 return expr;
-//             }
-//             case Ptiger::NOT: {
-//                 Tree expr = parse_expression(LBP_LOGICAL_NOT);
-//                 if (expr.is_error())
-//                     return Tree::error();
-//
-//                 if (expr.get_type() != boolean_type_node) {
-//                     error_at(tok->get_locus(),
-//                              "operand of logical not must be a boolean but it is %s",
-//                              print_type(expr.get_type()));
-//                     return Tree::error();
-//                 }
-//
-//                 expr = build_tree(TRUTH_NOT_EXPR, tok->get_locus(), boolean_type_node,
-//                                   expr);
-//                 return expr;
-//             }
-//             default:
-//                 unexpected_token(tok);
-//                 return Tree::error();
-//         }
-//     }
-//
-//     Tree
-//     Parser::coerce_binary_arithmetic(const_TokenPtr tok, Tree *left, Tree *right) {
-//         Tree left_type = left->get_type();
-//         Tree right_type = right->get_type();
-//
-//         if (left_type.is_error() || right_type.is_error())
-//             return Tree::error();
-//
-//         if (left_type == right_type) {
-//             if (left_type == integer_type_node || left_type == float_type_node) {
-//                 return left_type;
-//             }
-//         } else if ((left_type == integer_type_node && right_type == float_type_node)
-//                    || (left_type == float_type_node && right_type == integer_type_node)) {
-//             // We will coerce the integer into a float
-//             if (left_type == integer_type_node) {
-//                 *left = build_tree(FLOAT_EXPR, left->get_locus(), float_type_node,
-//                                    left->get_tree());
-//             } else {
-//                 *right = build_tree(FLOAT_EXPR, right->get_locus(),
-//                                     float_type_node, right->get_tree());
-//             }
-//             return float_type_node;
-//         }
-//
-//         // i.e. int + boolean
-//         error_at(tok->get_locus(),
-//                  "invalid operands of type %s and %s for operator %s",
-//                  print_type(left_type), print_type(right_type),
-//                  tok->get_token_description());
-//         return Tree::error();
-//     }
-//
-//     Parser::BinaryHandler
-//     Parser::get_binary_handler(TokenId id) {
-//         switch (id) {
-// #define BINARY_HANDLER(name, token_id)                                         \
-//                                                 case Ptiger::token_id:                                                         \
-//                                                 return &Parser::binary_##name;
-//             BINARY_HANDLER_LIST
-// #undef BINARY_HANDLER
-//             default:
-//                 return NULL;
-//         }
-//     }
-//
-//     Tree
-//     Parser::binary_plus(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_PLUS);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(PLUS_EXPR, tok->get_locus(), tree_type, left, right);
-//     }
-//
-//     Tree
-//     Parser::binary_minus(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_MINUS);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(MINUS_EXPR, tok->get_locus(), tree_type, left, right);
-//     }
-//
-//     Tree
-//     Parser::binary_mult(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_MUL);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(MULT_EXPR, tok->get_locus(), tree_type, left, right);
-//     }
-//
-//     Tree
-//     Parser::binary_div(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_DIV);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         if (left.get_type() == integer_type_node
-//             && right.get_type() == integer_type_node) {
-//             // Integer division (truncating, like in C)
-//             return build_tree(TRUNC_DIV_EXPR, tok->get_locus(), integer_type_node,
-//                               left, right);
-//         } else {
-//             // Real division
-//             Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//             if (tree_type.is_error())
-//                 return Tree::error();
-//
-//             gcc_assert(tree_type == float_type_node);
-//
-//             return build_tree(RDIV_EXPR, tok->get_locus(), tree_type, left, right);
-//         }
-//     }
-//
-//     Tree
-//     Parser::binary_mod(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_MOD);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         if (left.get_type() == integer_type_node
-//             && right.get_type() == integer_type_node) {
-//             // Integer division (truncating, like in C)
-//             return build_tree(TRUNC_MOD_EXPR, tok->get_locus(), integer_type_node,
-//                               left, right);
-//         } else {
-//             error_at(tok->get_locus(),
-//                      "operands of modulus must be of integer type");
-//             return Tree::error();
-//         }
-//     }
-//
-//     Tree
-//     Parser::binary_equal(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_EQUAL);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(EQ_EXPR, tok->get_locus(), boolean_type_node, left,
-//                           right);
-//     }
-//
-//     Tree
-//     Parser::binary_different(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_DIFFERENT);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(NE_EXPR, tok->get_locus(), boolean_type_node, left,
-//                           right);
-//     }
-//
-//     Tree
-//     Parser::binary_lower_than(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_LOWER_THAN);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(LT_EXPR, tok->get_locus(), boolean_type_node, left,
-//                           right);
-//     }
-//
-//     Tree
-//     Parser::binary_lower_equal(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_LOWER_EQUAL);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(LE_EXPR, tok->get_locus(), boolean_type_node, left,
-//                           right);
-//     }
-//
-//     Tree
-//     Parser::binary_greater_than(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_GREATER_THAN);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(GT_EXPR, tok->get_locus(), boolean_type_node, left,
-//                           right);
-//     }
-//
-//     Tree
-//     Parser::binary_greater_equal(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_GREATER_EQUAL);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
-//         if (tree_type.is_error())
-//             return Tree::error();
-//
-//         return build_tree(GE_EXPR, tok->get_locus(), boolean_type_node, left,
-//                           right);
-//     }
-//
-//     bool
-//     Parser::check_logical_operands(const_TokenPtr tok, Tree left, Tree right) {
-//         if (left.get_type() != boolean_type_node
-//             || right.get_type() != boolean_type_node) {
-//             error_at(
-//                     tok->get_locus(),
-//                     "operands of operator %s must be boolean but they are %s and %s\n",
-//                     tok->get_token_description(), print_type(left.get_type()),
-//                     print_type(right.get_type()));
-//             return false;
-//         }
-//
-//         return true;
-//     }
-//
-//     Tree
-//     Parser::binary_logical_and(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_LOGICAL_AND);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         if (!check_logical_operands(tok, left, right))
-//             return Tree::error();
-//
-//         return build_tree(TRUTH_ANDIF_EXPR, tok->get_locus(), boolean_type_node,
-//                           left, right);
-//     }
-//
-//     Tree
-//     Parser::binary_logical_or(const_TokenPtr tok, Tree left) {
-//         Tree right = parse_expression(LBP_LOGICAL_OR);
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         if (!check_logical_operands(tok, left, right))
-//             return Tree::error();
-//
-//         return build_tree(TRUTH_ORIF_EXPR, tok->get_locus(), boolean_type_node,
-//                           left, right);
-//     }
-//
-//     Tree
-//     Parser::binary_array_ref(const const_TokenPtr tok, Tree left) {
-//         Tree right = parse_integer_expression();
-//         if (right.is_error())
-//             return Tree::error();
-//
-//         if (!skip_token(Ptiger::RIGHT_SQUARE))
-//             return Tree::error();
-//
-//         if (!is_array_type(left.get_type())) {
-//             error_at(left.get_locus(), "does not have array type");
-//             return Tree::error();
-//         }
-//
-//         Tree element_type = TREE_TYPE(left.get_type().get_tree());
-//
-//         return build_tree(ARRAY_REF, tok->get_locus(), element_type, left, right, Tree(), Tree());
-//     }
-//
-//     Tree
-//     Parser::binary_field_ref(const const_TokenPtr tok, Tree left) {
-//         const_TokenPtr identifier = expect_token(Ptiger::IDENTIFIER);
-//         if (identifier == NULL) {
-//             return Tree::error();
-//         }
-//
-//         if (!is_record_type(left.get_type())) {
-//             error_at(left.get_locus(), "does not have record type");
-//             return Tree::error();
-//         }
-//
-//         Tree field_decl = TYPE_FIELDS(left.get_type().get_tree());
-//         while (!field_decl.is_null()) {
-//             Tree decl_name = DECL_NAME(field_decl.get_tree());
-//             const char *field_name = IDENTIFIER_POINTER(decl_name.get_tree());
-//
-//             if (field_name == identifier->get_str())
-//                 break;
-//
-//             field_decl = TREE_CHAIN(field_decl.get_tree());
-//         }
-//
-//         if (field_decl.is_null()) {
-//             error_at(left.get_locus(),
-//                      "record type does not have a field named '%s'",
-//                      identifier->get_str().c_str());
-//             return Tree::error();
-//         }
-//
-//         return build_tree(COMPONENT_REF, tok->get_locus(),
-//                           TREE_TYPE(field_decl.get_tree()), left, field_decl,
-//                           Tree());
-//     }
-//
-//     // This is invoked when a token (likely an operand) is found at a (likely
-//     // infix) non-prefix position
-//     Tree
-//     Parser::left_denotation(const_TokenPtr tok, Tree left) {
-//         BinaryHandler binary_handler = get_binary_handler(tok->get_id());
-//         if (binary_handler == NULL) {
-//             unexpected_token(tok);
-//             return Tree::error();
-//         }
-//
-//         return (this->*binary_handler)(tok, left);
-//     }
-//
-//     Tree
-//     Parser::parse_expression() {
-//         return parse_expression(/* right_binding_power */ 0);
-//     }
-//
-//     Tree
-//     Parser::parse_boolean_expression() {
-//         Tree expr = parse_expression();
-//         if (expr.is_error())
-//             return expr;
-//
-//         if (expr.get_type() != boolean_type_node) {
-//             error_at(expr.get_locus(),
-//                      "expected expression of boolean type but its type is %s",
-//                      print_type(expr.get_type()));
-//             return Tree::error();
-//         }
-//         return expr;
-//     }
+    Tree Parser::binary_equal(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_EQUAL);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(EQ_EXPR, tok->get_locus(), boolean_type_node, left,
+                          right);
+    }
+
+    Tree Parser::binary_different(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_DIFFERENT);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(NE_EXPR, tok->get_locus(), boolean_type_node, left,
+                          right);
+    }
+
+    Tree Parser::binary_lower_than(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_LOWER_THAN);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(LT_EXPR, tok->get_locus(), boolean_type_node, left,
+                          right);
+    }
+
+    Tree Parser::binary_lower_equal(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_LOWER_EQUAL);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(LE_EXPR, tok->get_locus(), boolean_type_node, left,
+                          right);
+    }
+
+    Tree Parser::binary_greater_than(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_GREATER_THAN);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(GT_EXPR, tok->get_locus(), boolean_type_node, left,
+                          right);
+    }
+
+    Tree Parser::binary_greater_equal(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_GREATER_EQUAL);
+        if (right.is_error())
+            return Tree::error();
+
+        Tree tree_type = coerce_binary_arithmetic(tok, &left, &right);
+        if (tree_type.is_error())
+            return Tree::error();
+
+        return build_tree(GE_EXPR, tok->get_locus(), boolean_type_node, left,
+                          right);
+    }
+
+    bool Parser::check_logical_operands(const_TokenPtr tok, Tree left, Tree right) {
+        if (left.get_type() != boolean_type_node
+            || right.get_type() != boolean_type_node) {
+            error_at(
+                    tok->get_locus(),
+                    "operands of operator %s must be boolean but they are %s and %s\n",
+                    tok->get_token_description(), print_type(left.get_type()),
+                    print_type(right.get_type()));
+            return false;
+        }
+
+        return true;
+    }
+
+    Tree Parser::binary_logical_and(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_LOGICAL_AND);
+        if (right.is_error())
+            return Tree::error();
+
+        if (!check_logical_operands(tok, left, right))
+            return Tree::error();
+
+        return build_tree(TRUTH_ANDIF_EXPR, tok->get_locus(), boolean_type_node,
+                          left, right);
+    }
+
+    Tree Parser::binary_logical_or(const_TokenPtr tok, Tree left) {
+        Tree right = parse_exp(LBP_LOGICAL_OR);
+        if (right.is_error())
+            return Tree::error();
+
+        if (!check_logical_operands(tok, left, right))
+            return Tree::error();
+
+        return build_tree(TRUTH_ORIF_EXPR, tok->get_locus(), boolean_type_node,
+                          left, right);
+    }
+
+    Tree Parser::binary_array_ref(const const_TokenPtr tok, Tree left) {
+        Tree right = parse_integer_expression();
+        if (right.is_error())
+            return Tree::error();
+
+        if (!skip_token(Ptiger::RBRACK))
+            return Tree::error();
+
+        if (!is_array_type(left.get_type())) {
+            error_at(left.get_locus(), "does not have array type");
+            return Tree::error();
+        }
+
+        Tree element_type = TREE_TYPE(left.get_type().get_tree());
+
+        return build_tree(ARRAY_REF, tok->get_locus(), element_type, left, right, Tree(), Tree());
+    }
+
+    Tree Parser::binary_field_ref(const const_TokenPtr tok, Tree left) {
+        const_TokenPtr identifier = expect_token(Ptiger::IDENTIFIER);
+        if (identifier == NULL) {
+            return Tree::error();
+        }
+
+        if (!is_record_type(left.get_type())) {
+            error_at(left.get_locus(), "does not have record type");
+            return Tree::error();
+        }
+
+        Tree field_decl = TYPE_FIELDS(left.get_type().get_tree());
+        while (!field_decl.is_null()) {
+            Tree decl_name = DECL_NAME(field_decl.get_tree());
+            const char *field_name = IDENTIFIER_POINTER(decl_name.get_tree());
+
+            if (field_name == identifier->get_str())
+                break;
+
+            field_decl = TREE_CHAIN(field_decl.get_tree());
+        }
+
+        if (field_decl.is_null()) {
+            error_at(left.get_locus(),
+                     "record type does not have a field named '%s'",
+                     identifier->get_str().c_str());
+            return Tree::error();
+        }
+
+        return build_tree(COMPONENT_REF, tok->get_locus(),
+                          TREE_TYPE(field_decl.get_tree()), left, field_decl,
+                          Tree());
+    }
+
+    // This is invoked when a token (likely an operand) is found at a (likely
+    // infix) non-prefix position
+    Tree Parser::left_denotation(const_TokenPtr tok, Tree left) {
+        BinaryHandler binary_handler = get_binary_handler(tok->get_id());
+        if (binary_handler == NULL) {
+            unexpected_token(tok);
+            return Tree::error();
+        }
+
+        return (this->*binary_handler)(tok, left);
+    }
+
+    Tree Parser::parse_exp() {
+        return parse_exp(/* right_binding_power */ 0);
+    }
+
+    Tree Parser::parse_boolean_expression() {
+        Tree expr = parse_exp();
+        if (expr.is_error())
+            return expr;
+
+        if (expr.get_type() != boolean_type_node) {
+            error_at(expr.get_locus(),
+                     "expected expression of boolean type but its type is %s",
+                     print_type(expr.get_type()));
+            return Tree::error();
+        }
+        return expr;
+    }
 //
     Tree
     Parser::parse_integer_expression() {
@@ -2070,26 +2074,37 @@ namespace Ptiger {
         }
         return expr;
     }
-//
-//     Tree
-//     Parser::parse_expression_naming_variable() {
-//         Tree expr = parse_expression();
-//         if (expr.is_error())
-//             return expr;
-//
-//         if (expr.get_tree_code() != VAR_DECL && expr.get_tree_code() != ARRAY_REF
-//             && expr.get_tree_code() != COMPONENT_REF) {
-//             error_at(expr.get_locus(),
-//                      "does not designate a variable, array element or field");
-//             return Tree::error();
-//         }
-//         return expr;
-//     }
-//
-//     Tree
-//     Parser::parse_lhs_assignment_expression() {
-//         return parse_expression_naming_variable();
-//     }
+
+    Tree Parser::parse_expression_naming_variable_declaration(Tree expr) {
+        if (expr.is_error())
+            return expr;
+
+        if (expr.get_tree_code() != VAR_DECL && expr.get_tree_code() != ARRAY_REF
+            && expr.get_tree_code() != COMPONENT_REF) {
+            error_at(expr.get_locus(),
+                     "does not designate a variable, array element or field");
+            return Tree::error();
+        }
+        return expr;
+    }
+
+    Tree Parser::parse_expression_naming_variable() {
+        Tree expr = parse_exp();
+        if (expr.is_error())
+            return expr;
+
+        if (expr.get_tree_code() != VAR_DECL && expr.get_tree_code() != ARRAY_REF
+            && expr.get_tree_code() != COMPONENT_REF) {
+            error_at(expr.get_locus(),
+                     "does not designate a variable, array element or field");
+            return Tree::error();
+        }
+        return expr;
+    }
+
+    Tree Parser::parse_lhs_assignment_expression() {
+        return parse_expression_naming_variable();
+    }
 } // END OF PTIGER NAMESPACE
 
 // ------------ Parse Functions Used By ptiger1.cc ------------------

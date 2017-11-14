@@ -68,6 +68,7 @@ namespace Ptiger {
   PTIGER_TOKEN_KEYWORD (TYPE, "type")                                           \
   PTIGER_TOKEN_KEYWORD (VAR, "var")                                             \
   PTIGER_TOKEN_KEYWORD (WHILE, "while")                                         \
+  PTIGER_TOKEN_KEYWORD (WRITE, "write")                                         \
                                                                                 \
   PTIGER_TOKEN (LAST_TOKEN, "<last-token-marker>")
 
