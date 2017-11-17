@@ -62,16 +62,16 @@ namespace Ptiger {
 
         Tree build_label_decl(const char *name, location_t loc);
 
-        Tree build_if_statement(Tree bool_expr, Tree then_part, Tree else_part);
+        Tree build_if_expression(Tree bool_expr, Tree then_part, Tree else_part);
 
-        Tree build_while_statement(Tree bool_expr, Tree while_body);
+        Tree build_while_expression(Tree bool_expr, Tree while_body);
 
-        Tree build_for_statement(SymbolPtr ind_var, Tree lower_bound, Tree upper_bound,
-                                 Tree for_body_stmt_list);
+        Tree build_for_expression(SymbolPtr ind_var, Tree lower_bound, Tree upper_bound,
+                                 Tree for_body_expr_list);
 
         const char *print_type(Tree type);
 
-        TreeStmtList &get_current_stmt_list();
+        TreeExprList &get_current_expr_list();
 
         void enter_scope();
 
@@ -90,7 +90,17 @@ namespace Ptiger {
 
         void parse_expression_seq(bool (Parser::*done)());
 
+        void parse_expression_parenthesis_seq(bool (Parser::*done)());
+
+        void parse_declaration_seq(bool (Parser::*done)());
+
         bool done_end();
+
+        bool done_let();
+
+        bool done_in();
+
+        bool done_parenthesis();
 
         bool done_end_or_else();
 
@@ -159,9 +169,11 @@ namespace Ptiger {
 
         Tree parse_if_expression();
 
-        Tree parse_while_statement();
+        Tree parse_while_expression();
 
-        Tree parse_for_statement();
+        Tree parse_for_expression();
+
+        Tree parse_for_declaration_expression(const_TokenPtr identifier);
 
         Tree parse_read_statement();
 
@@ -189,14 +201,13 @@ namespace Ptiger {
         Tree printf_fn;
         Tree scanf_fn;
 
-        std::vector <TreeStmtList> stack_stmt_list;
+        std::vector <TreeExprList> stack_expr_list;
         std::vector <TreeChain> stack_var_decl_chain;
 
         std::vector <BlockChain> stack_block_chain;
     };
 
-    void
-    Parser::skip_after_semicolon() {
+    void Parser::skip_after_semicolon() {
         const_TokenPtr t = lexer.peek_token();
 
         while (t->get_id() != Ptiger::END_OF_FILE && t->get_id() != Ptiger::SEMICOLON) {
@@ -208,8 +219,7 @@ namespace Ptiger {
             lexer.skip_token();
     }
 
-    void
-    Parser::skip_after_end() {
+    void Parser::skip_after_end() {
         const_TokenPtr t = lexer.peek_token();
 
         while (t->get_id() != Ptiger::END_OF_FILE && t->get_id() != Ptiger::END) {
@@ -221,8 +231,7 @@ namespace Ptiger {
             lexer.skip_token();
     }
 
-    const_TokenPtr
-    Parser::expect_token(Ptiger::TokenId token_id) {
+    const_TokenPtr Parser::expect_token(Ptiger::TokenId token_id) {
         const_TokenPtr t = lexer.peek_token();
         if (t->get_id() == token_id) {
             lexer.skip_token();
@@ -234,18 +243,15 @@ namespace Ptiger {
         }
     }
 
-    bool
-    Parser::skip_token(Ptiger::TokenId token_id) {
+    bool Parser::skip_token(Ptiger::TokenId token_id) {
         return expect_token(token_id) != const_TokenPtr();
     }
 
-    void
-    Parser::unexpected_token(const_TokenPtr t) {
+    void Parser::unexpected_token(const_TokenPtr t) {
         ::error_at(t->get_locus(), "unexpected %s\n", t->get_token_description());
     }
 
-    void
-    Parser::parse_program() {
+    void Parser::parse_program() {
         // Built type of main "int (int, char**)"
         tree main_fndecl_type_param[] = {
                 integer_type_node,                         /* int */
@@ -268,9 +274,9 @@ namespace Ptiger {
         tree set_result
                 = build2(INIT_EXPR, void_type_node, DECL_RESULT(main_fndecl),
                          build_int_cst_type(integer_type_node, 0));
-        tree return_stmt = build1(RETURN_EXPR, void_type_node, set_result);
+        tree return_expr = build1(RETURN_EXPR, void_type_node, set_result);
 
-        get_current_stmt_list().append(return_stmt);
+        get_current_expr_list().append(return_expr);
 
         // Leave top level scope, get its binding expression and its main block
         TreeSymbolMapping main_tree_scope = leave_scope();
@@ -298,9 +304,19 @@ namespace Ptiger {
         return (t->get_id() == Ptiger::END_OF_FILE);
     }
 
+    bool Parser::done_in() {
+        const_TokenPtr t = lexer.peek_token();
+        return (t->get_id() == Ptiger::IN);
+    }
+
     bool Parser::done_end() {
         const_TokenPtr t = lexer.peek_token();
         return (t->get_id() == Ptiger::END || t->get_id() == Ptiger::END_OF_FILE);
+    }
+
+    bool Parser::done_let() {
+        const_TokenPtr t = lexer.peek_token();
+        return (t->get_id() == Ptiger::END /*|| t->get_id() == Ptiger::END_OF_FILE*/);
     }
 
     bool Parser::done_end_or_else() {
@@ -309,27 +325,71 @@ namespace Ptiger {
                 || t->get_id() == Ptiger::END_OF_FILE);
     }
 
+    bool Parser::done_parenthesis() {
+        const_TokenPtr t = lexer.peek_token();
+        return (t->get_id() == Ptiger::RPAREN || t->get_id() == Ptiger::END);
+    }
+
+    // void Parser::parse_expression_seq(bool (Parser::*done)()) {
+    //     // Parse statements until done and append to the current stmt list;
+    //     while (!(this->*done)()) {
+    //         Tree expr = parse_expression();
+    //         get_current_expr_list().append(expr);
+    //     }
+    // }
+
     void Parser::parse_expression_seq(bool (Parser::*done)()) {
-        // Parse statements until done and append to the current stmt list;
         while (!(this->*done)()) {
             Tree expr = parse_expression();
-            get_current_stmt_list().append(expr);
+            get_current_expr_list().append(expr);
+            if(!(this->*done)())
+              skip_token(Ptiger::SEMICOLON);
+        }
+    }
+
+    void Parser::parse_expression_parenthesis_seq(bool (Parser::*done)()) {
+        bool isSequence = false;
+        const_TokenPtr t = lexer.peek_token();
+        if(t->get_id() == Ptiger::LPAREN){
+          isSequence = true;
+          lexer.skip_token();
+        }
+        if(isSequence){
+          while (!(this->*done) ()){
+              Tree expr = parse_expression();
+              get_current_expr_list().append(expr);
+              if(isSequence && !(this->*done)())
+                skip_token(Ptiger::SEMICOLON);
+            }
+            skip_token(Ptiger::RPAREN);
+            isSequence = false;
+        }else{
+          Tree expr = parse_expression();
+          get_current_expr_list().append(expr);
+        }
+    }
+
+    void Parser::parse_declaration_seq(bool (Parser::*done)()) {
+        // Parse statements until done and append to the current stmt list;
+        while (!(this->*done)()) {
+            Tree decl = parse_declaration();
+            get_current_expr_list().append(decl);
         }
     }
 
     void Parser::enter_scope() {
         scope.push_scope();
 
-        TreeStmtList stmt_list;
-        stack_stmt_list.push_back(stmt_list);
+        TreeExprList expr_list;
+        stack_expr_list.push_back(expr_list);
 
         stack_var_decl_chain.push_back(TreeChain());
         stack_block_chain.push_back(BlockChain());
     }
 
     Parser::TreeSymbolMapping Parser::leave_scope() {
-        TreeStmtList current_stmt_list = get_current_stmt_list();
-        stack_stmt_list.pop_back();
+        TreeExprList current_expr_list = get_current_expr_list();
+        stack_expr_list.pop_back();
 
         TreeChain var_decl_chain = stack_var_decl_chain.back();
         stack_var_decl_chain.pop_back();
@@ -354,7 +414,7 @@ namespace Ptiger {
 
         tree bind_expr
                 = build3(BIND_EXPR, void_type_node, var_decl_chain.first.get_tree(),
-                         current_stmt_list.get_tree(), new_block);
+                         current_expr_list.get_tree(), new_block);
 
         TreeSymbolMapping tree_scope;
         tree_scope.bind_expr = bind_expr;
@@ -365,19 +425,19 @@ namespace Ptiger {
         return tree_scope;
     }
 
-    TreeStmtList & Parser::get_current_stmt_list() {
-        return stack_stmt_list.back();
+    TreeExprList & Parser::get_current_expr_list() {
+        return stack_expr_list.back();
     }
 
     Tree Parser::parse_expression() {
         /*
         expression ->  let
-        |  assignment_statement
-        |  if_statement
-        |  while_statement
-        |  for_statement
-        |  read_statement
-        |  write_statement
+        |  let_expression
+        |  if_expression
+        |  for_expression
+        |  while_expression
+        |  assignment_expression
+        |  write_expression_quebrando_um_galho
         */
         const_TokenPtr t = lexer.peek_token();
         // printf("\tTOKEN NO PARSER : %s\n", t->get_token_description());
@@ -385,14 +445,18 @@ namespace Ptiger {
             case Ptiger::WRITE:
                 return parse_write_statement();
                 break;
-            case Ptiger::VAR:
-                return parse_variable_declaration();
-                break;
+            // case Ptiger::VAR:
+            //     return parse_variable_declaration();
+            //     break;
             case Ptiger::LET:
                 return parse_let_expression();
                 break;
             case Ptiger::IF:
                 return parse_if_expression();
+            case Ptiger::FOR:
+                return parse_for_expression();
+            case Ptiger::WHILE:
+                return parse_while_expression();
             case Ptiger::IDENTIFIER:
                 return parse_assignment_expression();
             default:
@@ -405,104 +469,6 @@ namespace Ptiger {
         gcc_unreachable();
     }
 
-    // Tree
-    // Parser::parse_statement() {
-    //     /*
-    //     statement ->  variable_declaration
-    //     |  assignment_statement
-    //     |  if_statement
-    //     |  while_statement
-    //     |  for_statement
-    //     |  read_statement
-    //     |  write_statement
-    //     */
-    //     const_TokenPtr t = lexer.peek_token();
-    //
-    //     switch (t->get_id()) {
-    //         case Ptiger::VAR:
-    //             return parse_variable_declaration();
-    //             break;
-    //         case Ptiger::TYPE:
-    //             return parse_type_declaration();
-    //             break;
-    //         case Ptiger::IF:
-    //             return parse_if_statement();
-    //             break;
-    //         case Ptiger::WHILE:
-    //             return parse_while_statement();
-    //             break;
-    //         case Ptiger::FOR:
-    //             return parse_for_statement();
-    //             break;
-    //         case Ptiger::READ:
-    //             return parse_read_statement();
-    //             break;
-    //         case Ptiger::WRITE:
-    //             return parse_write_statement();
-    //             break;
-    //         case Ptiger::IDENTIFIER:
-    //             return parse_assignment_statement();
-    //             break;
-    //         default:
-    //             unexpected_token(t);
-    //             skip_after_semicolon();
-    //             return Tree::error();
-    //             break;
-    //     }
-    //
-    //     gcc_unreachable();
-    // }
-
-    // Tree Parser::parse_variable_declaration() {
-    //     // variable_declaration -> "var" identifier ":" type ";"
-    //     if (!skip_token(Ptiger::VAR)) {
-    //         skip_after_semicolon();
-    //         return Tree::error();
-    //     }
-    //
-    //     const_TokenPtr identifier = expect_token(Ptiger::IDENTIFIER);
-    //     if (identifier == NULL) {
-    //         skip_after_semicolon();
-    //         return Tree::error();
-    //     }
-    //
-    //     if (!skip_token(Ptiger::COLON)) {
-    //         skip_after_semicolon();
-    //         return Tree::error();
-    //     }
-    //
-    //     Tree type_tree = parse_type();
-    //
-    //     if (type_tree.is_error()) {
-    //         skip_after_semicolon();
-    //         return Tree::error();
-    //     }
-    //
-    //     skip_token(Ptiger::SEMICOLON);
-    //
-    //     if (scope.get_current_mapping().get(identifier->get_str())) {
-    //         error_at(identifier->get_locus(),
-    //                  "name '%s' already declared in this scope",
-    //                  identifier->get_str().c_str());
-    //     }
-    //     SymbolPtr sym(new Symbol(Ptiger::VARIABLE, identifier->get_str()));
-    //     scope.get_current_mapping().insert(sym);
-    //
-    //     Tree decl = build_decl(identifier->get_locus(), VAR_DECL,
-    //                            get_identifier(sym->get_name().c_str()),
-    //                            type_tree.get_tree());
-    //     DECL_CONTEXT(decl.get_tree()) = main_fndecl;
-    //
-    //     gcc_assert(!stack_var_decl_chain.empty());
-    //     stack_var_decl_chain.back().append(decl);
-    //
-    //     sym->set_tree_decl(decl);
-    //
-    //     Tree stmt
-    //             = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
-    //
-    //     return stmt;
-    // }
 
     Tree Parser::parse_assignment_expression(){
       // assignment_statement -> expression ":=" expression ";"
@@ -632,8 +598,8 @@ namespace Ptiger {
         // }
 
 
-        Tree stmt = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
-        get_current_stmt_list().append(stmt);
+        Tree expr = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
+        get_current_expr_list().append(expr);
 
         // const_TokenPtr t = lexer.peek_token();
         // if (t->get_id() == Ptiger::ASSIGN){
@@ -837,11 +803,9 @@ namespace Ptiger {
     //     return record_type;
     // }
 
-    Tree
-    Parser::parse_type() {
+    Tree Parser::parse_type() {
         // type -> "int"
-        //      | "float"
-        //      | "bool"
+        //      | "real"
         //      | IDENTIFIER
         //      | type '[' expr ']'
         //      | type '(' expr : expr ')'
@@ -941,8 +905,7 @@ namespace Ptiger {
         return type;
     }
 
-    SymbolPtr
-    Parser::query_type(const std::string &name, location_t loc) {
+    SymbolPtr Parser::query_type(const std::string &name, location_t loc) {
         SymbolPtr sym = scope.lookup(name);
         if (sym == NULL) {
             error_at(loc, "type '%s' not declared in the current scope",
@@ -954,8 +917,7 @@ namespace Ptiger {
         return sym;
     }
 
-    SymbolPtr
-    Parser::query_variable(const std::string &name, location_t loc) {
+    SymbolPtr Parser::query_variable(const std::string &name, location_t loc) {
         SymbolPtr sym = scope.lookup(name);
         if (sym == NULL) {
             error_at(loc, "variable '%s' not declared in the current scope",
@@ -967,8 +929,7 @@ namespace Ptiger {
         return sym;
     }
 
-    SymbolPtr
-    Parser::query_integer_variable(const std::string &name, location_t loc) {
+    SymbolPtr Parser::query_integer_variable(const std::string &name, location_t loc) {
         SymbolPtr sym = query_variable(name, loc);
         if (sym != NULL) {
             Tree var_decl = sym->get_tree_decl();
@@ -984,44 +945,8 @@ namespace Ptiger {
         return sym;
     }
 
-    // Tree
-    // Parser::parse_assignment_statement() {
-    //     // assignment_statement -> expression ":=" expression ";"
-    //     Tree variable = parse_lhs_assignment_expression();
-    //
-    //     if (variable.is_error())
-    //         return Tree::error();
-    //
-    //     const_TokenPtr assig_tok = expect_token(Ptiger::ASSIG);
-    //     if (assig_tok == NULL) {
-    //         skip_after_semicolon();
-    //         return Tree::error();
-    //     }
-    //
-    //     const_TokenPtr first_of_expr = lexer.peek_token();
-    //
-    //     Tree expr = parse_expression();
-    //     if (expr.is_error())
-    //         return Tree::error();
-    //
-    //     skip_token(Ptiger::SEMICOLON);
-    //
-    //     if (variable.get_type() != expr.get_type()) {
-    //         error_at(first_of_expr->get_locus(),
-    //                  "cannot assign value of type %s to a variable of type %s",
-    //                  print_type(expr.get_type()),
-    //                  print_type(variable.get_type()));
-    //         return Tree::error();
-    //     }
-    //
-    //     Tree assig_expr = build_tree(MODIFY_EXPR, assig_tok->get_locus(),
-    //                                  void_type_node, variable, expr);
-    //
-    //     return assig_expr;
-    // }
 
-    Tree
-    Parser::build_label_decl(const char *name, location_t loc) {
+    Tree Parser::build_label_decl(const char *name, location_t loc) {
         tree t = build_decl(loc, LABEL_DECL, get_identifier(name), void_type_node);
 
         gcc_assert(main_fndecl != NULL_TREE);
@@ -1030,7 +955,7 @@ namespace Ptiger {
         return t;
     }
 
-    Tree Parser::build_if_statement(Tree bool_expr, Tree then_part, Tree else_part) {
+    Tree Parser::build_if_expression(Tree bool_expr, Tree then_part, Tree else_part) {
         if (bool_expr.is_error())
             return Tree::error();
 
@@ -1054,36 +979,36 @@ namespace Ptiger {
         else
             goto_else_or_endif = goto_endif;
 
-        TreeStmtList stmt_list;
+        TreeExprList expr_list;
 
         Tree cond_expr
                 = build_tree(COND_EXPR, bool_expr.get_locus(), void_type_node, bool_expr,
                              goto_then, goto_else_or_endif);
-        stmt_list.append(cond_expr);
+        expr_list.append(cond_expr);
 
         Tree then_label_expr = build_tree(LABEL_EXPR, then_part.get_locus(),
                                           void_type_node, then_label_decl);
-        stmt_list.append(then_label_expr);
+        expr_list.append(then_label_expr);
 
-        stmt_list.append(then_part);
+        expr_list.append(then_part);
 
         if (!else_part.is_null()) {
             // Make sure after then part has been executed we go to the end if
-            stmt_list.append(goto_endif);
+            expr_list.append(goto_endif);
 
             Tree else_label_expr = build_tree(LABEL_EXPR, else_part.get_locus(),
                                               void_type_node, else_label_decl);
-            stmt_list.append(else_label_expr);
+            expr_list.append(else_label_expr);
 
-            stmt_list.append(else_part);
+            expr_list.append(else_part);
         }
 
         // FIXME - location
         Tree endif_label_expr = build_tree(LABEL_EXPR, UNKNOWN_LOCATION,
                                            void_type_node, endif_label_decl);
-        stmt_list.append(endif_label_expr);
+        expr_list.append(endif_label_expr);
 
-        return stmt_list.get_tree();
+        return expr_list.get_tree();
     }
 
     Tree Parser::parse_if_expression() {
@@ -1091,26 +1016,28 @@ namespace Ptiger {
             skip_after_end();
             return Tree::error();
         }
+
         Tree expr = parse_boolean_expression();
 
         skip_token(Ptiger::THEN);
 
         enter_scope();
-        parse_expression_seq(&Parser::done_end_or_else);
+
+        parse_expression_parenthesis_seq(&Parser::done_parenthesis);
 
         TreeSymbolMapping then_tree_scope = leave_scope();
-        Tree then_stmt = then_tree_scope.bind_expr;
+        Tree then_expr = then_tree_scope.bind_expr;
 
-        Tree else_stmt;
+        Tree else_expr;
         const_TokenPtr tok = lexer.peek_token();
         if (tok->get_id() == Ptiger::ELSE) {
             // Consume 'else'
             skip_token(Ptiger::ELSE);
 
             enter_scope();
-            parse_expression_seq(&Parser::done_end);
+            parse_expression_parenthesis_seq(&Parser::done_parenthesis);
             TreeSymbolMapping else_tree_scope = leave_scope();
-            else_stmt = else_tree_scope.bind_expr;
+            else_expr = else_tree_scope.bind_expr;
 
             // Consume 'end'
             // skip_token(Ptiger::END);
@@ -1123,241 +1050,257 @@ namespace Ptiger {
         //     return Tree::error();
         // }
 
-        return build_if_statement(expr, then_stmt, else_stmt);
+        return build_if_expression(expr, then_expr, else_expr);
     }
 
-    Tree
-    Parser::build_let_expression(Tree decl, Tree in_part) {
-        if (decl.is_error())
-            return Tree::error();
-
-        Tree in_label_decl = build_label_decl("in", in_part.get_locus());
-
-
-
-        Tree endlet_label_decl = build_label_decl("end_let", in_part.get_locus());
-
-        Tree goto_in = build_tree(GOTO_EXPR, decl.get_locus(),
-                                    void_type_node, in_label_decl);
-        Tree goto_endlet = build_tree(GOTO_EXPR, decl.get_locus(),
-                                     void_type_node, endlet_label_decl);
-
-        TreeStmtList stmt_list;
-
-        Tree decl_expr= build_tree(DECL_EXPR, decl.get_locus(), void_type_node, decl, goto_in, goto_endlet);
-        stmt_list.append(decl_expr);
-
-        Tree in_label_expr = build_tree(LABEL_EXPR, in_part.get_locus(),
-                                          void_type_node, in_label_decl);
-        stmt_list.append(in_label_expr);
-
-        stmt_list.append(in_part);
-
-        // FIXME - location
-        Tree endlet_label_expr = build_tree(LABEL_EXPR, UNKNOWN_LOCATION,
-                                           void_type_node, endlet_label_decl);
-        stmt_list.append(endlet_label_expr);
-
-        return stmt_list.get_tree();
-    }
 
     Tree Parser::parse_let_expression() {
-        if (!skip_token(Ptiger::LET)) {
+        if (!skip_token (Ptiger::LET)){
+            skip_after_end ();
+            return Tree::error ();
+        }
+
+        enter_scope();
+        parse_declaration_seq(&Parser::done_in);
+
+        skip_token (Ptiger::IN);
+
+        parse_expression_seq(&Parser::done_let);
+
+        skip_token (Ptiger::END);
+
+        TreeSymbolMapping let_tree_scope = leave_scope ();
+        Tree let_exp = let_tree_scope.bind_expr;
+
+        //return build_if_expression (expr, then_stmt, else_stmt);
+        return let_exp;
+    }
+
+    Tree  Parser::build_while_expression(Tree bool_expr, Tree while_body) {
+        if (bool_expr.is_error())
+            return Tree::error();
+
+        TreeExprList expr_list;
+
+        Tree while_check_label_decl
+                = build_label_decl("while_check", bool_expr.get_locus());
+
+        Tree while_check_label_expr
+                = build_tree(LABEL_EXPR, bool_expr.get_locus(), void_type_node,
+                             while_check_label_decl);
+        expr_list.append(while_check_label_expr);
+
+        Tree while_body_label_decl
+                = build_label_decl("while_body", while_body.get_locus());
+        Tree end_of_while_label_decl
+                // FIXME - location
+                = build_label_decl("end_of_while", UNKNOWN_LOCATION);
+
+        Tree cond_expr
+                = build_tree(COND_EXPR, bool_expr.get_locus(), void_type_node, bool_expr,
+                             build_tree(GOTO_EXPR, bool_expr.get_locus(), void_type_node,
+                                        while_body_label_decl),
+                             build_tree(GOTO_EXPR, bool_expr.get_locus(), void_type_node,
+                                        end_of_while_label_decl));
+        expr_list.append(cond_expr);
+
+        Tree while_body_label_expr
+                = build_tree(LABEL_EXPR, while_body.get_locus(), void_type_node,
+                             while_body_label_decl);
+        expr_list.append(while_body_label_expr);
+
+        expr_list.append(while_body);
+
+        // FIXME - location
+        Tree goto_check = build_tree(GOTO_EXPR, UNKNOWN_LOCATION, void_type_node,
+                                     while_check_label_decl);
+        expr_list.append(goto_check);
+
+        // FIXME - location
+        Tree end_of_while_label_expr
+                = build_tree(LABEL_EXPR, UNKNOWN_LOCATION, void_type_node,
+                             end_of_while_label_decl);
+        expr_list.append(end_of_while_label_expr);
+
+        return expr_list.get_tree();
+    }
+
+    Tree Parser::parse_while_expression() {
+        if (!skip_token(Ptiger::WHILE)) {
             skip_after_end();
             return Tree::error();
         }
 
-        Tree decl = parse_declaration();
-
-        skip_token(Ptiger::IN);
+        Tree expr = parse_boolean_expression();
+        if (!skip_token(Ptiger::DO)) {
+            skip_after_end();
+            return Tree::error();
+        }
 
         enter_scope();
-        parse_expression_seq(&Parser::done_end);
+        parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+        TreeSymbolMapping while_body_tree_scope = leave_scope();
 
-        TreeSymbolMapping in_tree_scope = leave_scope();
-        Tree in_stmt = in_tree_scope.bind_expr;
+        Tree while_body_expr = while_body_tree_scope.bind_expr;
 
-        skip_token(Ptiger::END);
-        // const_TokenPtr tok = lexer.peek_token();
-        // if (tok->get_id() == Ptiger::END) {
-        //     // Consume 'end'
-        //     skip_token(Ptiger::END);
-        // } else {
-        //     unexpected_token(tok);
+        // skip_token(Ptiger::END);
+
+        return build_while_expression(expr, while_body_expr);
+    }
+
+    Tree Parser::build_for_expression(SymbolPtr ind_var, Tree lower_bound, Tree upper_bound, Tree for_body_expr_list) {
+        if (ind_var == NULL)
+            return Tree::error();
+        Tree ind_var_decl = ind_var->get_tree_decl();
+
+        // Lower
+        if (lower_bound.is_error())
+            return Tree::error();
+
+        // Upper
+        if (upper_bound.is_error())
+            return Tree::error();
+
+        // ind_var := lower;
+        TreeExprList expr_list;
+
+        Tree init_ind_var = build_tree(MODIFY_EXPR, /* FIXME */ UNKNOWN_LOCATION,
+                                       void_type_node, ind_var_decl, lower_bound);
+        expr_list.append(init_ind_var);
+
+        // ind_var <= upper
+        Tree while_condition
+                = build_tree(LE_EXPR, upper_bound.get_locus(), boolean_type_node,
+                             ind_var_decl, upper_bound);
+
+        // for-body
+        // ind_var := ind_var + 1
+        Tree incr_ind_var
+                = build_tree(MODIFY_EXPR, /* FIXME */ UNKNOWN_LOCATION, void_type_node,
+                             ind_var_decl,
+                             build_tree(PLUS_EXPR, UNKNOWN_LOCATION, integer_type_node,
+                                        ind_var_decl,
+                                        build_int_cst_type(::integer_type_node, 1)));
+
+        // Wrap as a stmt list
+        TreeExprList for_expr_list = for_body_expr_list;
+        for_expr_list.append(incr_ind_var);
+
+        // construct the associated while statement
+        Tree while_expr
+                = build_while_expression(while_condition, for_expr_list.get_tree());
+        expr_list.append(while_expr);
+
+        return expr_list.get_tree();
+    }
+
+    Tree Parser::parse_for_declaration_expression(const_TokenPtr identifier) {
+
+        // const_TokenPtr identifier = expect_token(Ptiger::IDENTIFIER);
+        // if (identifier == NULL) {
+        //     skip_after_end();
         //     return Tree::error();
         // }
 
-        return build_let_expression(decl, in_stmt);
+
+        const_TokenPtr assig_tok = expect_token(Ptiger::ASSIGN);
+        if (assig_tok == NULL) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        Tree lower_bound = parse_integer_expression();
+
+
+        Tree type_tree = integer_type_node;
+
+        // if (type_tree.is_error()) {
+        //       skip_after_end();
+        //       return Tree::error();
+        // }
+
+        if (scope.get_current_mapping().get(identifier->get_str())) {
+            error_at(identifier->get_locus(),
+                     "name '%s' already declared in this scope",
+                     identifier->get_str().c_str());
+        }
+
+        SymbolPtr sym(new Symbol(Ptiger::VARIABLE, identifier->get_str()));
+        scope.get_current_mapping().insert(sym);
+
+        Tree decl = build_decl(identifier->get_locus(), VAR_DECL,
+                               get_identifier(sym->get_name().c_str()),
+                               type_tree.get_tree());
+        DECL_CONTEXT(decl.get_tree()) = main_fndecl;
+
+        gcc_assert(!stack_var_decl_chain.empty());
+        stack_var_decl_chain.back().append(decl);
+
+        sym->set_tree_decl(decl);
+
+
+        Tree expr = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
+        get_current_expr_list().append(expr);
+
+
+        return lower_bound;
     }
 
-    // Tree
-    // Parser::build_while_statement(Tree bool_expr, Tree while_body) {
-    //     if (bool_expr.is_error())
-    //         return Tree::error();
-    //
-    //     TreeStmtList stmt_list;
-    //
-    //     Tree while_check_label_decl
-    //             = build_label_decl("while_check", bool_expr.get_locus());
-    //
-    //     Tree while_check_label_expr
-    //             = build_tree(LABEL_EXPR, bool_expr.get_locus(), void_type_node,
-    //                          while_check_label_decl);
-    //     stmt_list.append(while_check_label_expr);
-    //
-    //     Tree while_body_label_decl
-    //             = build_label_decl("while_body", while_body.get_locus());
-    //     Tree end_of_while_label_decl
-    //             // FIXME - location
-    //             = build_label_decl("end_of_while", UNKNOWN_LOCATION);
-    //
-    //     Tree cond_expr
-    //             = build_tree(COND_EXPR, bool_expr.get_locus(), void_type_node, bool_expr,
-    //                          build_tree(GOTO_EXPR, bool_expr.get_locus(), void_type_node,
-    //                                     while_body_label_decl),
-    //                          build_tree(GOTO_EXPR, bool_expr.get_locus(), void_type_node,
-    //                                     end_of_while_label_decl));
-    //     stmt_list.append(cond_expr);
-    //
-    //     Tree while_body_label_expr
-    //             = build_tree(LABEL_EXPR, while_body.get_locus(), void_type_node,
-    //                          while_body_label_decl);
-    //     stmt_list.append(while_body_label_expr);
-    //
-    //     stmt_list.append(while_body);
-    //
-    //     // FIXME - location
-    //     Tree goto_check = build_tree(GOTO_EXPR, UNKNOWN_LOCATION, void_type_node,
-    //                                  while_check_label_decl);
-    //     stmt_list.append(goto_check);
-    //
-    //     // FIXME - location
-    //     Tree end_of_while_label_expr
-    //             = build_tree(LABEL_EXPR, UNKNOWN_LOCATION, void_type_node,
-    //                          end_of_while_label_decl);
-    //     stmt_list.append(end_of_while_label_expr);
-    //
-    //     return stmt_list.get_tree();
-    // }
-    //
-    // Tree
-    // Parser::parse_while_statement() {
-    //     if (!skip_token(Ptiger::WHILE)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     Tree expr = parse_boolean_expression();
-    //     if (!skip_token(Ptiger::DO)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     enter_scope();
-    //     parse_statement_seq(&Parser::done_end);
-    //     TreeSymbolMapping while_body_tree_scope = leave_scope();
-    //
-    //     Tree while_body_stmt = while_body_tree_scope.bind_expr;
-    //
-    //     skip_token(Ptiger::END);
-    //
-    //     return build_while_statement(expr, while_body_stmt);
-    // }
-    //
-    // Tree
-    // Parser::build_for_statement(SymbolPtr ind_var, Tree lower_bound,
-    //                             Tree upper_bound, Tree for_body_stmt_list) {
-    //     if (ind_var == NULL)
-    //         return Tree::error();
-    //     Tree ind_var_decl = ind_var->get_tree_decl();
-    //
-    //     // Lower
-    //     if (lower_bound.is_error())
-    //         return Tree::error();
-    //
-    //     // Upper
-    //     if (upper_bound.is_error())
-    //         return Tree::error();
-    //
-    //     // ind_var := lower;
-    //     TreeStmtList stmt_list;
-    //
-    //     Tree init_ind_var = build_tree(MODIFY_EXPR, /* FIXME */ UNKNOWN_LOCATION,
-    //                                    void_type_node, ind_var_decl, lower_bound);
-    //     stmt_list.append(init_ind_var);
-    //
-    //     // ind_var <= upper
-    //     Tree while_condition
-    //             = build_tree(LE_EXPR, upper_bound.get_locus(), boolean_type_node,
-    //                          ind_var_decl, upper_bound);
-    //
-    //     // for-body
-    //     // ind_var := ind_var + 1
-    //     Tree incr_ind_var
-    //             = build_tree(MODIFY_EXPR, /* FIXME */ UNKNOWN_LOCATION, void_type_node,
-    //                          ind_var_decl,
-    //                          build_tree(PLUS_EXPR, UNKNOWN_LOCATION, integer_type_node,
-    //                                     ind_var_decl,
-    //                                     build_int_cst_type(::integer_type_node, 1)));
-    //
-    //     // Wrap as a stmt list
-    //     TreeStmtList for_stmt_list = for_body_stmt_list;
-    //     for_stmt_list.append(incr_ind_var);
-    //
-    //     // construct the associated while statement
-    //     Tree while_stmt
-    //             = build_while_statement(while_condition, for_stmt_list.get_tree());
-    //     stmt_list.append(while_stmt);
-    //
-    //     return stmt_list.get_tree();
-    // }
+    Tree Parser::parse_for_expression() {
+        if (!skip_token(Ptiger::FOR)) {
+            skip_after_end();
+            return Tree::error();
+        }
 
-    // Tree
-    // Parser::parse_for_statement() {
-    //     if (!skip_token(Ptiger::FOR)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     const_TokenPtr identifier = expect_token(Ptiger::IDENTIFIER);
-    //     if (identifier == NULL) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     if (!skip_token(Ptiger::ASSIG)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     Tree lower_bound = parse_integer_expression();
-    //
-    //     if (!skip_token(Ptiger::TO)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     Tree upper_bound = parse_integer_expression();
-    //
-    //     if (!skip_token(Ptiger::DO)) {
-    //         skip_after_end();
-    //         return Tree::error();
-    //     }
-    //
-    //     enter_scope();
-    //     parse_statement_seq(&Parser::done_end);
-    //
-    //     TreeSymbolMapping for_body_tree_scope = leave_scope();
-    //     Tree for_body_stmt = for_body_tree_scope.bind_expr;
-    //
-    //     skip_token(Ptiger::END);
-    //
-    //     // Induction var
-    //     SymbolPtr ind_var
-    //             = query_integer_variable(identifier->get_str(), identifier->get_locus());
-    //
-    //     return build_for_statement(ind_var, lower_bound, upper_bound, for_body_stmt);
-    // }
+        const_TokenPtr identifier = lexer.peek_token();
+        if (identifier->get_id() != Ptiger::IDENTIFIER) {
+            skip_after_end();
+            return Tree::error();
+        }
+        lexer.skip_token();
+
+        // const_TokenPtr identifier = expect_token(Ptiger::IDENTIFIER);
+        // if (identifier == NULL) {
+        //     skip_after_end();
+        //     return Tree::error();
+        // }
+        //
+        //
+        //
+        // if (!skip_token(Ptiger::ASSIGN)) {
+        //     skip_after_end();
+        //     return Tree::error();
+        // }
+        //
+        // Tree lower_bound = parse_integer_expression();
+
+        Tree lower_bound = parse_for_declaration_expression(identifier);
+
+        if (!skip_token(Ptiger::TO)) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        Tree upper_bound = parse_integer_expression();
+
+        if (!skip_token(Ptiger::DO)) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        enter_scope();
+        parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+
+        TreeSymbolMapping for_body_tree_scope = leave_scope();
+        Tree for_body_expr = for_body_tree_scope.bind_expr;
+
+        // skip_token(Ptiger::END);
+
+        // Induction var
+        SymbolPtr ind_var = query_integer_variable(identifier->get_str(), identifier->get_locus());
+
+        return build_for_expression(ind_var, lower_bound, upper_bound, for_body_expr);
+    }
 
     // Tree
     // Parser::get_scanf_addr() {
@@ -2060,9 +2003,8 @@ namespace Ptiger {
         return expr;
     }
 //
-    Tree
-    Parser::parse_integer_expression() {
-        Tree expr = parse_expression();
+    Tree Parser::parse_integer_expression() {
+        Tree expr = parse_exp();
         if (expr.is_error())
             return expr;
 

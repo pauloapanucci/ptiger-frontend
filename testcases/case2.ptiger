@@ -1,0 +1,7 @@
+let
+	var x: int := 10
+	var y: real := 1.5
+in
+	write x
+	write y
+end

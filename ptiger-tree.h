@@ -109,11 +109,11 @@ namespace Ptiger {
     }
 
 // Adapter for TREE_LIST
-    struct TreeStmtList {
+    struct TreeExprList {
     public:
-        TreeStmtList() : list(alloc_stmt_list()) {}
+        TreeExprList() : list(alloc_stmt_list()) {}
 
-        TreeStmtList(Tree t) : list(t.get_tree()) {}
+        TreeExprList(Tree t) : list(t.get_tree()) {}
 
         void
         append(Tree t) {
