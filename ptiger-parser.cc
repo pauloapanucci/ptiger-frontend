@@ -64,6 +64,8 @@ namespace Ptiger {
 
         Tree build_if_expression(Tree bool_expr, Tree then_part, Tree else_part);
 
+        Tree build_function_declaration(const_TokenPtr funcname, Tree paramlist, int nargs, Tree return_type, Tree function_body_expr);
+
         Tree build_while_expression(Tree bool_expr, Tree while_body);
 
         Tree build_for_expression(SymbolPtr ind_var, Tree lower_bound, Tree upper_bound,
@@ -80,6 +82,11 @@ namespace Ptiger {
             Tree block;
         };
 
+        struct FuncArgsList {
+            TreeExprList args_type;
+            int n_args;
+        };
+
         TreeSymbolMapping leave_scope();
 
         SymbolPtr query_type(const std::string &name, location_t loc);
@@ -89,6 +96,8 @@ namespace Ptiger {
         SymbolPtr query_integer_variable(const std::string &name, location_t loc);
 
         void parse_expression_seq(bool (Parser::*done)());
+
+        Tree parse_param_list(bool (Parser::*done)(), int *nargs);
 
         void parse_expression_parenthesis_seq(bool (Parser::*done)());
 
@@ -154,6 +163,8 @@ namespace Ptiger {
         Tree parse_declaration();
 
         Tree parse_variable_declaration();
+
+        Tree parse_function_declaration();
 
         Tree parse_type_declaration();
 
@@ -624,6 +635,91 @@ namespace Ptiger {
         return assign_tree;
     }
 
+    Tree Parser::parse_param_list(bool (Parser::*done)(), int *nargs){
+        TreeExprList list;
+        while (!(this->*done)()) {
+          Tree type = parse_type();
+          list.append(type);
+          (*nargs)++;
+          if (!skip_token(Ptiger::COLON)) {
+              skip_after_end();
+              return Tree::error();
+          }
+          const_TokenPtr paramid = expect_token(Ptiger::IDENTIFIER);
+          if(!(this->*done)())
+              if (!skip_token(Ptiger::COMMA)) {
+                  skip_after_end();
+                  return Tree::error();
+              }
+        }
+        return list.get_tree();
+    }
+
+    Tree Parser::build_function_declaration(const_TokenPtr funcname, Tree paramlist, int nargs, Tree return_type, Tree function_body_expr){
+        tree argslist[] = {
+                                 void_type_node
+                               };
+        tree fun_dec_type = build_varargs_function_type_array(return_type.get_tree(), nargs, argslist);
+        tree fun_decl = build_fn_decl(funcname->get_str().c_str(), fun_dec_type);
+        DECL_EXTERNAL(fun_decl) = 1;
+        tree fun = build1(ADDR_EXPR, build_pointer_type(fun_dec_type), fun_decl);
+        // tree exprTest = build_int_cst_type(integer_type_node, 20);
+        tree funexp = build_call_array_loc(UNKNOWN_LOCATION, return_type.get_tree(), fun, nargs, argslist);
+        return funexp;
+
+    }
+
+
+    Tree Parser::parse_function_declaration(){
+        if (!skip_token(Ptiger::FUNCTION)) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        const_TokenPtr funcname = expect_token(Ptiger::IDENTIFIER);
+        if (funcname == NULL) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        if (!skip_token(Ptiger::LPAREN)) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        int nargs = 0;
+        // Tree paramlist = parse_param_list(&Parser::done_parenthesis, &nargs);
+
+        if (!skip_token(Ptiger::RPAREN)) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        bool hasRet = false;
+        Tree return_type = void_type_node;
+        const_TokenPtr t = lexer.peek_token();
+        if(t->get_id() == Ptiger::COLON) {
+            hasRet = true;
+            lexer.skip_token();
+            return_type = parse_type();
+        }
+
+        if (!skip_token(Ptiger::EQ)) {
+            skip_after_end();
+            return Tree::error();
+        }
+
+        enter_scope();
+
+        parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+
+        TreeSymbolMapping function_body_scope = leave_scope();
+        Tree function_body_expr = function_body_scope.bind_expr;
+
+        return build_function_declaration(funcname, paramlist, nargs, return_type, function_body_expr);
+
+    }
+
     // Tree Parser::parse_type_declaration() {
     //     // type_declaration -> "type" identifier ":" type ";"
     //     if (!skip_token(Ptiger::TYPE)) {
@@ -682,6 +778,8 @@ namespace Ptiger {
 //                return parse_type_declaration();
           case Ptiger::VAR:
               return parse_variable_declaration();
+          case Ptiger::FUNCTION:
+              return parse_function_declaration();
           default:
             unexpected_token(t);
             skip_after_semicolon();
