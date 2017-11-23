@@ -206,6 +206,12 @@ namespace Ptiger {
                             } else {
                                 skip_input();
                                 current_column++;
+                                if(peek_input() == '\n'){
+                                    linemap_line_start(::line_table, current_line, max_column_hint);
+                                    current_line++;
+                                    current_column = 1;
+                                    skip_input();
+                                }
                             }
 
                             if (current_char == EOF) { //STOP GETING CHAR BY CHAR WHEN EOF

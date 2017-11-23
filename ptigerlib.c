@@ -42,6 +42,10 @@ void print_integer(int n) {
     printf("%d", n);
 }
 
+void print_hello_ptiger() {
+    printf("HELLO PTIGER, NOW YOU CAN USE FUNC FROM EXTERNAL SHARED LIB!\n");
+}
+
 void pflush() {
     fflush(stdout);
 }
