@@ -105,6 +105,8 @@ namespace Ptiger {
 
         void parse_expression_parenthesis_seq(bool (Parser::*done)());
 
+        Tree parse_func_expression_seq(bool (Parser::*done)());
+
         void parse_declaration_seq(bool (Parser::*done)());
 
         bool done_end();
@@ -392,6 +394,30 @@ namespace Ptiger {
           Tree expr = parse_expression();
           get_current_expr_list().append(expr);
         }
+    }
+
+    Tree Parser::parse_func_expression_seq(bool (Parser::*done)()){
+        bool isSequence = false;
+        const_TokenPtr t = lexer.peek_token();
+        Tree expr;
+        if(t->get_id() == Ptiger::LPAREN){
+          isSequence = true;
+          lexer.skip_token();
+        }
+        if(isSequence){
+          while (!(this->*done) ()){
+              expr = parse_expression();
+              get_current_expr_list().append(expr);
+              if(isSequence && !(this->*done)())
+                skip_token(Ptiger::SEMICOLON);
+            }
+            skip_token(Ptiger::RPAREN);
+            isSequence = false;
+        }else{
+          expr = parse_expression();
+          get_current_expr_list().append(expr);
+        }
+        return expr;
     }
 
     void Parser::parse_declaration_seq(bool (Parser::*done)()) {
@@ -876,6 +902,8 @@ namespace Ptiger {
             return Tree::error();
         }
 
+        const_TokenPtr first_of_expr = lexer.peek_token();
+
         std::list<Ptiger::Func::arg> argslist = parse_param_list(&Parser::done_parenthesis);
 
         if (!skip_token(Ptiger::RPAREN)) {
@@ -897,7 +925,7 @@ namespace Ptiger {
 
         enter_scope();
 
-        parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+        Tree last_expr = parse_func_expression_seq(&Parser::done_parenthesis);
 
         TreeSymbolMapping function_body_scope = leave_scope();
         Tree function_body_expr = function_body_scope.bind_expr;
@@ -905,7 +933,55 @@ namespace Ptiger {
         FuncPtr func(new Func(Ptiger::INTERNAL, funcname->get_str(), return_type.get_tree(), argslist));
         scope.get_current_mapping_fn().insert(func);
 
-        return function_body_expr;
+        /////////////////BUILD FUNC
+
+        int foosize = argslist.size();
+        tree fn_type;
+        if(foosize == 0){
+            tree args[] = {NULL_TREE};
+            fn_type = build_function_type_array(return_type.get_tree(), 0, args);
+        }
+        else{
+            tree args[foosize];
+            // tree args[1] = {integer_type_node};
+            int i = 0;
+            for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it){
+                args[i] = it->arg_type;
+                i++;
+            }
+            fn_type = build_function_type_array(return_type.get_tree(), foosize, args);
+            // fn_type = build_varargs_function_type_array(return_type.get_tree(), 1, args);
+        }
+
+        tree fn_build_decl = build_fn_decl(funcname->get_str().c_str(), fn_type);
+        // build return
+        tree ret_decl = build_decl(UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, return_type.get_tree());
+        DECL_CONTEXT(ret_decl) = fn_build_decl;
+        DECL_RESULT(fn_build_decl) = ret_decl;
+
+        tree set_result = build2(INIT_EXPR, void_type_node, DECL_RESULT(fn_build_decl),
+                         convert(return_type.get_tree(), last_expr.get_tree()));
+
+        tree return_expr = build1(RETURN_EXPR, void_type_node, set_result);
+
+        get_current_expr_list().append(return_expr);
+
+
+        BLOCK_SUPERCONTEXT(function_body_expr.get_tree()) = main_fndecl;
+        DECL_INITIAL(fn_build_decl) = function_body_expr.get_tree();
+        DECL_SAVED_TREE(fn_build_decl) = function_body_scope.bind_expr.get_tree();
+
+        DECL_EXTERNAL(fn_build_decl) = 0;
+        DECL_PRESERVE_P(fn_build_decl) = 1;
+
+        // Convert from GENERIC to GIMPLE
+        gimplify_function_tree(fn_build_decl);
+
+        // Insert it into the graph
+        cgraph_node::finalize_function(fn_build_decl, true);
+
+        return fn_build_decl;
+        // fn_build_decl = NULL_TREE;
 
     }
 
