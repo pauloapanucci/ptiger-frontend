@@ -26,6 +26,8 @@ ptiger_OBJS = \
       ptiger/ptiger-lexer.o \
       ptiger/ptiger-symbol.o \
       ptiger/ptiger-symbol-mapping.o \
+      ptiger/ptiger-func.o \
+      ptiger/ptiger-func-mapping.o \
       ptiger/ptiger-scope.o \
       ptiger/ptiger-convert.o \
       $(END)

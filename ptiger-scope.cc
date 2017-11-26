@@ -11,9 +11,20 @@ namespace Ptiger {
     }
 
     void
+    Scope::push_scope_fn() {
+        func_map_stack.push_back(FuncMapping());
+    }
+
+    void
     Scope::pop_scope() {
         gcc_assert(!map_stack.empty());
         map_stack.pop_back();
+    }
+
+    void
+    Scope::pop_scope_fn() {
+        gcc_assert(!func_map_stack.empty());
+        func_map_stack.pop_back();
     }
 
     SymbolPtr
@@ -25,5 +36,16 @@ namespace Ptiger {
             }
         }
         return SymbolPtr();
+    }
+
+    FuncPtr
+    Scope::lookup_fn(const std::string &str) {
+        for (FuncMapStack::reverse_iterator funcmap = func_map_stack.rbegin();
+             funcmap != func_map_stack.rend(); funcmap++) {
+            if (FuncPtr fun = funcmap->get(str)) {
+                return fun;
+            }
+        }
+        return FuncPtr();
     }
 }
