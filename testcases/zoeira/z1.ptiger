@@ -2,9 +2,13 @@
 let
 	var x : int := 10
 	var y : real := 10.5
+	function test1() = print_hello_ptiger()
+	function test2() = print_integer(10000)
 in
 	x := 10;
 	write x;
 	print_hello_ptiger();
 	print_integer(x+3*2);
+	test1();
+	test2();
 end

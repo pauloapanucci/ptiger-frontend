@@ -733,6 +733,292 @@ namespace Ptiger {
 
     }
 
+//     std::list<Ptiger::Func::arg> Parser::parse_param_list(bool (Parser::*done)()){
+//         Ptiger::Func::arg a;
+//         std::list<Ptiger::Func::arg> list;
+//         // std::list<Ptiger::Func::arg>iterator it;
+//         int i = 0;
+//         while (!(this->*done)()) {
+//             Tree type = parse_type();
+//             a.arg_type = type.get_tree();
+//             a.expr = NULL_TREE;
+//             // it = list.end();
+//             // list.insert(it, a);
+//             list.push_back(a);
+//             if (!skip_token(Ptiger::COLON)) {
+//               skip_after_end();
+//               error_at(type.get_locus(), "missing ':' token");
+//               return std::list<Ptiger::Func::arg>();
+//             }
+//             const_TokenPtr paramid = expect_token(Ptiger::IDENTIFIER);
+//             if(!(this->*done)())
+//               if (!skip_token(Ptiger::COMMA)) {
+//                   skip_after_end();
+//                   error_at(type.get_locus(), "missing ',' token");
+//                   return std::list<Ptiger::Func::arg>();
+//               }
+//           }
+//           return list;
+//     }
+//
+//     std::list<Ptiger::Func::arg> Parser::parse_param_list_call(bool (Parser::*done)()){
+//         // printf("parsing paramlist\n");
+//         Ptiger::Func::arg a;
+//         std::list<Ptiger::Func::arg> list;
+//         // std::list<Ptiger::Func::arg>iterator it;
+//         int i = 0;
+//         while (!(this->*done)()) {
+//             // printf("parsing argument %d\n", ++i);
+//             Tree expr = parse_exp();
+//             a.expr = expr.get_tree();
+//             Tree type = expr.get_type();
+//             a.arg_type = type.get_tree();
+//             // it = list.end();
+//             // list.insert(it, a);
+//             list.push_back(a);
+//             // tree t = expr.get_type();
+//             if(!(this->*done)())
+//               if (!skip_token(Ptiger::COMMA)) {
+//                   skip_after_end();
+//                   error_at(expr.get_locus(), "missing ',' token");
+//                   return std::list<Ptiger::Func::arg>();
+//               }
+//             }
+//             return list;
+//     }
+//
+//     Tree Parser::parse_function_call(FuncPtr func){
+//
+//         const_TokenPtr funcname = expect_token(Ptiger::IDENTIFIER);
+//         printf("vou chamar a função ~%s~\n", func->get_name().c_str());
+//         if (funcname == NULL) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//
+//         if (!skip_token(Ptiger::LPAREN)) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//
+//         const_TokenPtr first_of_expr = lexer.peek_token();
+//
+//         std::list<Ptiger::Func::arg> funcall_argslist = parse_param_list_call(&Parser::done_parenthesis);
+//         // Tree arg = parse_exp();
+//
+//         // printf("funcall_argslist.size() -> %d\n", funcall_argslist.size());
+//         int foo1 = funcall_argslist.size();
+//         int foo2 = func->get_argslist_size();
+//
+//         if(foo1 < foo2){
+//             // printf(" foo1 -> %d | foo2 -> %d\n", foo1, foo2);
+//             error_at(funcname->get_locus(), "few arguments to this function");
+//             return Tree::error();
+//         } else if (foo1 > foo2){
+//             // printf(" foo1 -> %d | foo2 -> %d\n", foo1, foo2);
+//             error_at(funcname->get_locus(), "to many arguments to this function");
+//             return Tree::error();
+//         } else if(foo1 != 0){
+//             // printf(" foo1 -> %d | foo2 -> %d\n", foo1, foo2);
+//             for (std::list<Ptiger::Func::arg>::iterator it1 = funcall_argslist.begin(), it2 = func->get_argslist().begin();
+//                     it1 != funcall_argslist.end(), it2 != func->get_argslist().end();
+//                         ++it1, ++it2){
+//                 if(it1->arg_type != it2->arg_type){
+//                     error_at(funcname->get_locus(), "expecting another type of argument");
+//                     return Tree::error();
+//                 }
+//             }
+//         }
+//         if (!skip_token(Ptiger::RPAREN)) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//
+//         tree fncall_type;
+//
+//         if(foo2 == 0){
+//             tree args[] = {NULL_TREE};
+//             fncall_type = build_varargs_function_type_array(func->get_ret_type(), 0, args);
+//         }
+//         else{
+//             tree args[foo2];
+//             // tree args[1] = {integer_type_node};
+//             int i = 0;
+//             for (std::list<Ptiger::Func::arg>::iterator it = func->get_argslist().begin(); it != func->get_argslist().end(); ++it){
+//                 args[i] = it->arg_type;
+//                 i++;
+//             }
+//             fncall_type = build_varargs_function_type_array(func->get_ret_type(), foo2, args);
+//             // fncall_type = build_varargs_function_type_array(func->get_ret_type(), 1, args);
+//         }
+//
+//         tree fn_call = build_fn_decl(func->get_name().c_str(), fncall_type);
+//         DECL_EXTERNAL(fn_call) = 1;
+//
+//         Tree fn = build1(ADDR_EXPR, build_pointer_type(fncall_type), fn_call);
+//
+// ///////
+//         tree expr;
+//         if(foo2 == 0){
+//             tree args[] = {NULL_TREE};
+//             expr = build_call_array_loc(funcname->get_locus(), func->get_ret_type(), fn.get_tree(), 0, args);
+//         }
+//         else{
+//             tree args[foo2];
+//             // args[0] = arg.get_tree();
+//             int i = 0;
+//             for (std::list<Ptiger::Func::arg>::iterator it = funcall_argslist.begin(); it != funcall_argslist.end(); ++it){
+//                 // args[i] = it->expr;
+//                 args[i] = it->expr;
+//                 i++;
+//             }
+//
+//             expr = build_call_array_loc(funcname->get_locus(), func->get_ret_type(), fn.get_tree(), foo2, args);
+//             // expr = build_call_array_loc(first_of_expr->get_locus(), func->get_ret_type(), fn.get_tree(), 1, args);
+//         }
+//
+//         return expr;
+//     }
+//
+//
+//     Tree Parser::parse_function_declaration(){
+//         if (!skip_token(Ptiger::FUNCTION)) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//
+//         const_TokenPtr funcname = expect_token(Ptiger::IDENTIFIER);
+//         if (funcname == NULL) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//         printf("to parsando a função ~%s~\n", funcname->get_str().c_str());
+//
+//         if (scope.get_current_mapping_fn().get(funcname->get_str())) {
+//             error_at(funcname->get_locus(),
+//                      "function '%s' already declared in this scope",
+//                      funcname->get_str().c_str());
+//         }
+//
+//         if (!skip_token(Ptiger::LPAREN)) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//         printf("vou pegar os argumentos !!\n");
+//
+//         const_TokenPtr first_of_expr = lexer.peek_token();
+//
+//         std::list<Ptiger::Func::arg> argslist = parse_param_list(&Parser::done_parenthesis);
+//
+//         if (!skip_token(Ptiger::RPAREN)) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//         printf("terminei com os argumentos!!\n");
+//
+//         tree return_type = void_type_node;
+//         // const_TokenPtr t = lexer.peek_token();
+//         // if(t->get_id() == Ptiger::COLON) {
+//         //     lexer.skip_token();
+//         //     return_type = parse_type();
+//         // }
+//         printf("verifiquei o retorno !!\n");
+//         if (return_type == void_type_node)
+//             printf("a função não tem retorno\n");
+//
+//         if (!skip_token(Ptiger::EQ)) {
+//             skip_after_end();
+//             return Tree::error();
+//         }
+//         printf("vou começar a parsar o corpo da função !!\n");
+//
+//         enter_scope();
+//
+//         Tree last_expr = parse_func_expression_seq(&Parser::done_parenthesis);
+//         // parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+//         printf("parsei o corpo!!\n");
+//
+//         TreeSymbolMapping function_body_scope = leave_scope();
+//         Tree function_body_expr = function_body_scope.bind_expr;
+//
+//         FuncPtr func(new Func(Ptiger::INTERNAL, funcname->get_str(), return_type, argslist));
+//         scope.get_current_mapping_fn().insert(func);
+//         printf("adicionei na lista de funções!!\n");
+//
+//         /////////////////BUILD FUNC
+//
+//         int foosize = argslist.size();
+//         tree fn_type;
+//         if(foosize == 0){
+//             tree args[] = {NULL_TREE};
+//             fn_type = build_function_type_array(return_type, 0, args);
+//         }
+//         else{
+//             tree args[foosize];
+//             // tree args[1] = {integer_type_node};
+//             int i = 0;
+//             for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it){
+//                 args[i] = it->arg_type;
+//                 i++;
+//             }
+//             fn_type = build_function_type_array(return_type, foosize, args);
+//             // fn_type = build_varargs_function_type_array(return_type, 1, args);
+//         }
+//         printf("to buildando 1 !!\n");
+//
+//         tree fn_build_decl = build_fn_decl(funcname->get_str().c_str(), fn_type);
+//
+//         printf("to buildando 2 !!\n");
+//
+//         // tree ret_decl = build_decl(UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, return_type);
+//         // DECL_CONTEXT(ret_decl) = fn_build_decl;
+//         // DECL_RESULT(fn_build_decl) = ret_decl;
+//         // printf("to buildando 3 !!\n");
+//
+//         // tree set_result;
+//         // if (return_type == void_type_node) {
+//         //     set_result = build2(INIT_EXPR, void_type_node, DECL_RESULT(fn_build_decl),
+//         //                      return_type);
+//         //                      printf("to buildando 4.1 !!\n");
+//         //     // set_result = NULL_TREE;
+//         // }
+//         // else{
+//         //     set_result = build2(INIT_EXPR, void_type_node, DECL_RESULT(fn_build_decl),
+//         //                      convert(return_type, last_expr.get_tree()));
+//         //                      printf("to buildando 4.2 !!\n");
+//         // }
+//         //
+//         //
+//         // tree return_expr = build1(RETURN_EXPR, void_type_node, set_result);
+//         // printf("to buildando 5 !!\n");
+//         //
+//         // get_current_expr_list().append(return_expr);
+//
+//         printf("to buildando 6 !!\n");
+//
+//         BLOCK_SUPERCONTEXT(function_body_expr.get_tree()) = main_fndecl;
+//         DECL_INITIAL(fn_build_decl) = function_body_expr.get_tree();
+//         DECL_SAVED_TREE(fn_build_decl) = function_body_scope.bind_expr.get_tree();
+//         printf("to buildando 7 !!\n");
+//
+//         DECL_EXTERNAL(fn_build_decl) = 0;
+//         DECL_PRESERVE_P(fn_build_decl) = 1;
+//         printf("to buildando 8 !!\n");
+//
+//         // Convert from GENERIC to GIMPLE
+//         gimplify_function_tree(fn_build_decl);
+//         // printf("to buildando 9 !!\n");
+//         //
+//         // // Insert it into the graph
+//         cgraph_node::finalize_function(fn_build_decl, true);
+//         // printf("to buildando 10 !!\n");
+//
+//         return fn_build_decl;
+//         // fn_build_decl = NULL_TREE;
+//         // return NULL_TREE;
+//
+//     }
+
     std::list<Ptiger::Func::arg> Parser::parse_param_list(bool (Parser::*done)()){
         Ptiger::Func::arg a;
         std::list<Ptiger::Func::arg> list;
@@ -788,7 +1074,9 @@ namespace Ptiger {
     }
 
     Tree Parser::parse_function_call(FuncPtr func){
+
         const_TokenPtr funcname = expect_token(Ptiger::IDENTIFIER);
+        printf("vou chamar a função ~%s~\n", func->get_name().c_str());
         if (funcname == NULL) {
             skip_after_end();
             return Tree::error();
@@ -855,7 +1143,7 @@ namespace Ptiger {
 
         Tree fn = build1(ADDR_EXPR, build_pointer_type(fncall_type), fn_call);
 
-///////
+    ///////
         tree expr;
         if(foo2 == 0){
             tree args[] = {NULL_TREE};
@@ -879,6 +1167,145 @@ namespace Ptiger {
     }
 
 
+    // Tree Parser::parse_function_declaration(){
+    //     if (!skip_token(Ptiger::FUNCTION)) {
+    //         skip_after_end();
+    //         return Tree::error();
+    //     }
+    //
+    //     const_TokenPtr funcname = expect_token(Ptiger::IDENTIFIER);
+    //     if (funcname == NULL) {
+    //         skip_after_end();
+    //         return Tree::error();
+    //     }
+    //     printf("to parsando a função ~%s~\n", funcname->get_str().c_str());
+    //
+    //     if (scope.get_current_mapping_fn().get(funcname->get_str())) {
+    //         error_at(funcname->get_locus(),
+    //                  "function '%s' already declared in this scope",
+    //                  funcname->get_str().c_str());
+    //     }
+    //
+    //     if (!skip_token(Ptiger::LPAREN)) {
+    //         skip_after_end();
+    //         return Tree::error();
+    //     }
+    //     printf("vou pegar os argumentos !!\n");
+    //
+    //     const_TokenPtr first_of_expr = lexer.peek_token();
+    //
+    //     std::list<Ptiger::Func::arg> argslist = parse_param_list(&Parser::done_parenthesis);
+    //
+    //     if (!skip_token(Ptiger::RPAREN)) {
+    //         skip_after_end();
+    //         return Tree::error();
+    //     }
+    //     printf("terminei com os argumentos!!\n");
+    //
+    //     tree return_type = void_type_node;
+    //     // const_TokenPtr t = lexer.peek_token();
+    //     // if(t->get_id() == Ptiger::COLON) {
+    //     //     lexer.skip_token();
+    //     //     return_type = parse_type();
+    //     // }
+    //     printf("verifiquei o retorno !!\n");
+    //     if (return_type == void_type_node)
+    //         printf("a função não tem retorno\n");
+    //
+    //     if (!skip_token(Ptiger::EQ)) {
+    //         skip_after_end();
+    //         return Tree::error();
+    //     }
+    //     printf("vou começar a parsar o corpo da função !!\n");
+    //
+    //     enter_scope();
+    //
+    //     Tree last_expr = parse_func_expression_seq(&Parser::done_parenthesis);
+    //     // parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+    //     printf("parsei o corpo!!\n");
+    //
+    //     TreeSymbolMapping function_body_scope = leave_scope();
+    //     Tree function_body_expr = function_body_scope.bind_expr;
+    //
+    //     FuncPtr func(new Func(Ptiger::INTERNAL, funcname->get_str(), return_type, argslist));
+    //     scope.get_current_mapping_fn().insert(func);
+    //     printf("adicionei na lista de funções!!\n");
+    //
+    //     /////////////////BUILD FUNC
+    //
+    //     int foosize = argslist.size();
+    //     tree fn_type;
+    //     if(foosize == 0){
+    //         tree args[] = {NULL_TREE};
+    //         fn_type = build_function_type_array(return_type, 0, args);
+    //     }
+    //     else{
+    //         tree args[foosize];
+    //         // tree args[1] = {integer_type_node};
+    //         int i = 0;
+    //         for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it){
+    //             args[i] = it->arg_type;
+    //             i++;
+    //         }
+    //         fn_type = build_function_type_array(return_type, foosize, args);
+    //         // fn_type = build_varargs_function_type_array(return_type, 1, args);
+    //     }
+    //     printf("to buildando 1 !!\n");
+    //
+    //     tree fn_build_decl = build_fn_decl(funcname->get_str().c_str(), fn_type);
+    //
+    //     printf("to buildando 2 !!\n");
+    //
+    //     // tree ret_decl = build_decl(UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, return_type);
+    //     // DECL_CONTEXT(ret_decl) = fn_build_decl;
+    //     // DECL_RESULT(fn_build_decl) = ret_decl;
+    //     // printf("to buildando 3 !!\n");
+    //
+    //     // tree set_result;
+    //     // if (return_type == void_type_node) {
+    //     //     set_result = build2(INIT_EXPR, void_type_node, DECL_RESULT(fn_build_decl),
+    //     //                      return_type);
+    //     //                      printf("to buildando 4.1 !!\n");
+    //     //     // set_result = NULL_TREE;
+    //     // }
+    //     // else{
+    //     //     set_result = build2(INIT_EXPR, void_type_node, DECL_RESULT(fn_build_decl),
+    //     //                      convert(return_type, last_expr.get_tree()));
+    //     //                      printf("to buildando 4.2 !!\n");
+    //     // }
+    //     //
+    //     //
+    //     // tree return_expr = build1(RETURN_EXPR, void_type_node, set_result);
+    //     // printf("to buildando 5 !!\n");
+    //     //
+    //     // get_current_expr_list().append(return_expr);
+    //
+    //     printf("to buildando 6 !!\n");
+    //
+    //     BLOCK_SUPERCONTEXT(function_body_expr.get_tree()) = main_fndecl;
+    //     DECL_INITIAL(fn_build_decl) = function_body_expr.get_tree();
+    //     DECL_SAVED_TREE(fn_build_decl) = function_body_scope.bind_expr.get_tree();
+    //     printf("to buildando 7 !!\n");
+    //
+    //     DECL_EXTERNAL(fn_build_decl) = 0;
+    //     DECL_PRESERVE_P(fn_build_decl) = 1;
+    //     printf("to buildando 8 !!\n");
+    //
+    //     // Convert from GENERIC to GIMPLE
+    //     gimplify_function_tree(fn_build_decl);
+    //     // printf("to buildando 9 !!\n");
+    //     //
+    //     // // Insert it into the graph
+    //     cgraph_node::finalize_function(fn_build_decl, true);
+    //     // printf("to buildando 10 !!\n");
+    //
+    //     return fn_build_decl;
+    //     // fn_build_decl = NULL_TREE;
+    //     // return NULL_TREE;
+    //
+    // }
+
+
     Tree Parser::parse_function_declaration(){
         if (!skip_token(Ptiger::FUNCTION)) {
             skip_after_end();
@@ -890,6 +1317,7 @@ namespace Ptiger {
             skip_after_end();
             return Tree::error();
         }
+        printf("to parsando a função ~%s~\n", funcname->get_str().c_str());
 
         if (scope.get_current_mapping_fn().get(funcname->get_str())) {
             error_at(funcname->get_locus(),
@@ -901,6 +1329,7 @@ namespace Ptiger {
             skip_after_end();
             return Tree::error();
         }
+        printf("vou pegar os argumentos !!\n");
 
         const_TokenPtr first_of_expr = lexer.peek_token();
 
@@ -910,28 +1339,36 @@ namespace Ptiger {
             skip_after_end();
             return Tree::error();
         }
+        printf("terminei com os argumentos!!\n");
 
-        Tree return_type = void_type_node;
-        const_TokenPtr t = lexer.peek_token();
-        if(t->get_id() == Ptiger::COLON) {
-            lexer.skip_token();
-            return_type = parse_type();
-        }
+        tree return_type = void_type_node;
+        // const_TokenPtr t = lexer.peek_token();
+        // if(t->get_id() == Ptiger::COLON) {
+        //     lexer.skip_token();
+        //     return_type = parse_type();
+        // }
+        printf("verifiquei o retorno !!\n");
+        if (return_type == void_type_node)
+            printf("a função não tem retorno\n");
 
         if (!skip_token(Ptiger::EQ)) {
             skip_after_end();
             return Tree::error();
         }
+        printf("vou começar a parsar o corpo da função !!\n");
 
         enter_scope();
 
         Tree last_expr = parse_func_expression_seq(&Parser::done_parenthesis);
+        // parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+        printf("parsei o corpo!!\n");
 
         TreeSymbolMapping function_body_scope = leave_scope();
         Tree function_body_expr = function_body_scope.bind_expr;
 
-        FuncPtr func(new Func(Ptiger::INTERNAL, funcname->get_str(), return_type.get_tree(), argslist));
+        FuncPtr func(new Func(Ptiger::INTERNAL, funcname->get_str(), return_type, argslist));
         scope.get_current_mapping_fn().insert(func);
+        printf("adicionei na lista de funções!!\n");
 
         /////////////////BUILD FUNC
 
@@ -939,7 +1376,7 @@ namespace Ptiger {
         tree fn_type;
         if(foosize == 0){
             tree args[] = {NULL_TREE};
-            fn_type = build_function_type_array(return_type.get_tree(), 0, args);
+            fn_type = build_function_type_array(return_type, 0, args);
         }
         else{
             tree args[foosize];
@@ -949,39 +1386,61 @@ namespace Ptiger {
                 args[i] = it->arg_type;
                 i++;
             }
-            fn_type = build_function_type_array(return_type.get_tree(), foosize, args);
-            // fn_type = build_varargs_function_type_array(return_type.get_tree(), 1, args);
+            fn_type = build_function_type_array(return_type, foosize, args);
+            // fn_type = build_varargs_function_type_array(return_type, 1, args);
         }
 
-        tree fn_build_decl = build_fn_decl(funcname->get_str().c_str(), fn_type);
-        // build return
-        tree ret_decl = build_decl(UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, return_type.get_tree());
-        DECL_CONTEXT(ret_decl) = fn_build_decl;
-        DECL_RESULT(fn_build_decl) = ret_decl;
+        //build fundec
+        tree ident = get_identifier (funcname->get_str().c_str());
+        tree fndecl = build_decl (BUILTINS_LOCATION, FUNCTION_DECL, ident, fn_type);
 
-        tree set_result = build2(INIT_EXPR, void_type_node, DECL_RESULT(fn_build_decl),
-                         convert(return_type.get_tree(), last_expr.get_tree()));
+        DECL_EXTERNAL (fndecl) = 0;
+        TREE_PUBLIC (fndecl) = 1;
+        TREE_STATIC (fndecl) = 1;
+        tree arglist = NULL_TREE;
 
-        tree return_expr = build1(RETURN_EXPR, void_type_node, set_result);
+        //define return
+        tree result_decl = build_decl (BUILTINS_LOCATION, RESULT_DECL, NULL_TREE,
+                                         return_type);
+        DECL_RESULT (fndecl) = result_decl;
 
-        get_current_expr_list().append(return_expr);
+        SET_DECL_ASSEMBLER_NAME (fndecl, ident);
+
+        // tree self_parm_decl = build_decl (BUILTINS_LOCATION, PARM_DECL,
+        //                                     get_identifier ("a"),
+        //                                     integer_type_node);
+        //
+        // DECL_CONTEXT (self_parm_decl) = fndecl;
+        // DECL_ARG_TYPE (self_parm_decl) = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
+        // TREE_READONLY (self_parm_decl) = 1;
+        // arglist = chainon (arglist, self_parm_decl);
+        //
+        // TREE_USED (self_parm_decl) = 1;
+        // DECL_ARGUMENTS (fndecl) = arglist;
+
+        get_current_expr_list().append(function_body_scope.bind_expr.get_tree());
 
 
-        BLOCK_SUPERCONTEXT(function_body_expr.get_tree()) = main_fndecl;
-        DECL_INITIAL(fn_build_decl) = function_body_expr.get_tree();
-        DECL_SAVED_TREE(fn_build_decl) = function_body_scope.bind_expr.get_tree();
+        DECL_INITIAL(fndecl) = function_body_scope.bind_expr.get_tree();
 
-        DECL_EXTERNAL(fn_build_decl) = 0;
-        DECL_PRESERVE_P(fn_build_decl) = 1;
+        tree bl = make_node(BLOCK);
+        BLOCK_SUPERCONTEXT(bl) = fndecl;
+        DECL_INITIAL(fndecl) = bl;
+        BLOCK_VARS(bl) = NULL_TREE;
+        TREE_USED(bl) = 1;
+        tree bind = build3(BIND_EXPR, void_type_node, BLOCK_VARS(bl),
+                           NULL_TREE, bl);
+        TREE_SIDE_EFFECTS(bind) = 1;
 
-        // Convert from GENERIC to GIMPLE
-        gimplify_function_tree(fn_build_decl);
+        BIND_EXPR_BODY(bind) = function_body_scope.bind_expr.get_tree();
+        // block = bind;
+        DECL_SAVED_TREE(fndecl) = bind;
 
-        // Insert it into the graph
-        cgraph_node::finalize_function(fn_build_decl, true);
+        gimplify_function_tree (fndecl);
+        cgraph_node::add_new_function(fndecl, false);
+        cgraph_node::finalize_function(fndecl, true);
 
-        return fn_build_decl;
-        // fn_build_decl = NULL_TREE;
+        return fndecl;
 
     }
 
@@ -1044,6 +1503,7 @@ namespace Ptiger {
           case Ptiger::VAR:
               return parse_variable_declaration();
           case Ptiger::FUNCTION:
+              printf("achei uma declaração de função\n");
               return parse_function_declaration();
           default:
             unexpected_token(t);
