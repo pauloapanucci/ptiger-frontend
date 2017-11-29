@@ -39,7 +39,7 @@ void print(struct string *s) {
 }
 
 void print_integer(int n) {
-    printf("%d", n);
+    printf("%d\n", n);
 }
 
 void print_hello_ptiger() {

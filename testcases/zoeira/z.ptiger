@@ -1,0 +1,10 @@
+/*este/*é um */teste*/
+let
+	var x : int  := 10
+    function test() =
+        print_integer(100)
+
+in
+	print_integer(x);
+    test();
+end

@@ -26,4 +26,14 @@ namespace Ptiger {
         return SymbolPtr();
     }
 
+    // void
+    // SymbolMapping::remove(const std::string &str) const {
+    //     Map::const_iterator it = map.find(str);
+    //     if (it != map.end()) {
+    //         // return it->second;
+    //         map.erase(it->second);
+    //     }
+    //     // return SymbolPtr();
+    // }
+
 }

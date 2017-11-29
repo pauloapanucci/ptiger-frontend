@@ -12,6 +12,8 @@ namespace Ptiger {
 
         void insert(SymbolPtr s);
 
+        // void remove(const std::string &str) const; 
+
         SymbolPtr get(const std::string &str) const;
 
     private:
