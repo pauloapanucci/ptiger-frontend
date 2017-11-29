@@ -190,3 +190,70 @@ Tree Parser::parse_function_declaration(){
     return NULL_TREE;
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+tree ident = get_identifier (funcname->get_str().c_str());
+tree fndecl = build_decl (BUILTINS_LOCATION, FUNCTION_DECL, ident, fn_type);
+
+DECL_EXTERNAL (fndecl) = 0;
+TREE_PUBLIC (fndecl) = 1;
+TREE_STATIC (fndecl) = 1;
+tree arglist = NULL_TREE;
+
+tree result_decl = build_decl (BUILTINS_LOCATION, RESULT_DECL, NULL_TREE,
+                               return_type);
+DECL_RESULT (fndecl) = result_decl;
+
+SET_DECL_ASSEMBLER_NAME (fndecl, ident);
+
+// tree self_parm_decl = build_decl (BUILTINS_LOCATION, PARM_DECL,
+//                                   get_identifier ("argname"),
+//                                   type);
+//
+// DECL_CONTEXT (self_parm_decl) = fndecl;
+// DECL_ARG_TYPE (self_parm_decl) = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
+// TREE_READONLY (self_parm_decl) = 1;
+// arglist = chainon (arglist, self_parm_decl);
+//
+// TREE_USED (self_parm_decl) = 1;
+// DECL_ARGUMENTS (fndecl) = arglist;
+
+tree block = function_body_scope.bind_expr.get_tree();
+
+get_current_expr_list().append(block);
+
+DECL_INITIAL(fndecl) = block;
+
+tree bl = function_block.get_tree();
+BLOCK_SUPERCONTEXT(bl) = fndecl;
+DECL_INITIAL(fndecl) = bl;
+BLOCK_VARS(bl) = NULL_TREE;
+TREE_USED(bl) = 1;
+tree bind = build3(BIND_EXPR, void_type_node, BLOCK_VARS(bl),
+                   NULL_TREE, bl);
+TREE_SIDE_EFFECTS(bind) = 1;
+
+BIND_EXPR_BODY(bind) = block;
+// block = bind;
+DECL_SAVED_TREE(fndecl) = bind;
+
+gimplify_function_tree(fndecl);
+// Insert it into the graph
+cgraph_node::add_new_function(fndecl, false);
+cgraph_node::finalize_function(fndecl, true);
+
+return NULL_TREE;

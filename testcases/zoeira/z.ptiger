@@ -1,8 +1,19 @@
 /*este/*é um */teste*/
 let
 	var x : int  := 10
-    function test() =
-        print_integer(100)
+    function test() = (
+        print_integer(100);
+		print_integer(200);
+		print_integer(300);
+		if 1 <> 0 then
+			print_hello_ptiger();
+	)
+	/*function test3(a: int) =
+        let
+			var n : int := 2
+		in
+			print_integer(n);
+		end*/
 
 in
 	print_integer(x);

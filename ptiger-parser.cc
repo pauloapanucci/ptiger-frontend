@@ -1031,24 +1031,13 @@ std::list<Ptiger::Func::arg> Parser::parse_param_list(bool (Parser::*done)()){
                         error_at(paramid->get_locus(), "missing ':' token");
                         return std::list<Ptiger::Func::arg>();
                 }
+
                 Tree type = parse_type();
                 a.arg_type = type.get_tree();
                 a.expr = NULL_TREE;
-                // it = list.end();
-                // list.insert(it, a);
+                a.argname = paramid->get_str();
+
                 list.push_back(a);
-                // Tree type = parse_type();
-                // a.arg_type = type.get_tree();
-                // a.expr = NULL_TREE;
-                // // it = list.end();
-                // // list.insert(it, a);
-                // list.push_back(a);
-                // if (!skip_token(Ptiger::COLON)) {
-                //   skip_after_end();
-                //   error_at(type.get_locus(), "missing ':' token");
-                //   return std::list<Ptiger::Func::arg>();
-                // }
-                // const_TokenPtr paramid = expect_token(Ptiger::IDENTIFIER);
                 if(!(this->*done)())
                         if (!skip_token(Ptiger::COMMA)) {
                                 skip_after_end();
@@ -1071,6 +1060,7 @@ std::list<Ptiger::Func::arg> Parser::parse_param_list_call(bool (Parser::*done)(
                 a.expr = expr.get_tree();
                 Tree type = expr.get_type();
                 a.arg_type = type.get_tree();
+                // a.argname = NULL;
                 // it = list.end();
                 // list.insert(it, a);
                 list.push_back(a);
@@ -1200,7 +1190,7 @@ Tree Parser::parse_function_declaration(){
                 return Tree::error();
         }
 
-        const_TokenPtr first_of_expr = lexer.peek_token();
+        // const_TokenPtr first_of_expr = lexer.peek_token();
 
         std::list<Ptiger::Func::arg> argslist = parse_param_list(&Parser::done_parenthesis);
 
@@ -1210,12 +1200,12 @@ Tree Parser::parse_function_declaration(){
         }
 
         tree return_type = void_type_node;
-        const_TokenPtr t = lexer.peek_token();
-        if(t->get_id() == Ptiger::COLON) {
-                lexer.skip_token();
-                Tree r = parse_type();
-                return_type = r.get_tree();
-        }
+        // const_TokenPtr t = lexer.peek_token();
+        // if(t->get_id() == Ptiger::COLON) {
+        //         lexer.skip_token();
+        //         Tree r = parse_type();
+        //         return_type = r.get_tree();
+        // }
 
         if (!skip_token(Ptiger::EQ)) {
                 skip_after_end();
@@ -1229,36 +1219,49 @@ Tree Parser::parse_function_declaration(){
         /////////////////BUILD FUNC
 
         // BUILD FUNCTION  TYPE CONSIDERING RET_TYPE AND ARGUMENTS
+
+        enter_scope();
+        // printf("%s - 1\n", funcname->get_str().c_str());
+        const_TokenPtr first_of_expr = lexer.peek_token();
+
+
+        Tree last_expr = parse_func_expression_seq(&Parser::done_parenthesis);
+        // parse_expression_parenthesis_seq(&Parser::done_parenthesis);
+
+        TreeSymbolMapping function_body_scope = leave_scope();
+        Tree function_block = function_body_scope.block;
+        // printf("%s - 2\n", funcname->get_str().c_str());
         int foosize = argslist.size();
         tree fn_type;
+        tree thereareargs[foosize];
         if(foosize == 0) {
                 tree args[] = {NULL_TREE};
                 fn_type = build_function_type_array(void_type_node, 0, args);
         }
         else{
-                printf("entrei nos argumentos errados\n");
-                tree args[foosize];
+                // thereareargs[foosize];
                 // tree args[1] = {integer_type_node};
                 int i = 0;
                 for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it) {
-                        args[i] = it->arg_type;
+                        thereareargs[i] = it->arg_type;
                         i++;
                 }
-                fn_type = build_function_type_array(return_type, foosize, args);
+                fn_type = build_function_type_array(return_type, foosize, thereareargs);
                 // fn_type = build_varargs_function_type_array(return_type, 1, args);
         }
-
+        // printf("%s - 3\n", funcname->get_str().c_str());
         // BUILD FUNCTION DECLARATION
-        tree fndecl = build_fn_decl(funcname->get_str().c_str(), fn_type);
-
-        //ENTER IN FUNC SCOPE, PARSING THE BODY
-        enter_scope();
-
-        Tree last_expr = parse_func_expression_seq(&Parser::done_parenthesis);
-        // parse_expression_parenthesis_seq(&Parser::done_parenthesis);
-
+        // tree fndecl = build_fn_decl(funcname->get_str().c_str(), fn_type);
+        tree ident = get_identifier (funcname->get_str().c_str());
+        tree fndecl = build_decl (BUILTINS_LOCATION, FUNCTION_DECL, ident, fn_type);
+        // printf("%s - 4\n", funcname->get_str().c_str());
+        DECL_EXTERNAL (fndecl) = 0;
+        TREE_PUBLIC (fndecl) = 1;
+        TREE_STATIC (fndecl) = 1;
+        // printf("%s - 5\n", funcname->get_str().c_str());
+        tree arglist = NULL_TREE;
+        // printf("%s - 6\n", funcname->get_str().c_str());
         if(return_type != void_type_node) {
-            printf("Entrei onde não devia\n");
                 tree resdecl = build_decl(UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, return_type);
                 DECL_CONTEXT(resdecl) = fndecl;
                 DECL_RESULT(fndecl) = resdecl;
@@ -1268,28 +1271,76 @@ Tree Parser::parse_function_declaration(){
 
                 get_current_expr_list().append(return_expr);
         }
+        else {
+            tree result_decl = build_decl (BUILTINS_LOCATION, RESULT_DECL, NULL_TREE, return_type);
+            DECL_RESULT (fndecl) = result_decl;
+        }
+        // printf("%s - 7\n", funcname->get_str().c_str());
 
-        TreeSymbolMapping function_body_scope = leave_scope();
-        Tree function_block = function_body_scope.block;
+        SET_DECL_ASSEMBLER_NAME (fndecl, ident);
+        // printf("%s - 8\n", funcname->get_str().c_str());
+        if(foosize != 0) {
+            int i = 0;
+            for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it) {
+                    // args[i] = it->arg_type;
+                    // printf("HALLO WIE GEHTS?\n");
+                    // printf("%s - 1 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
 
-        // Finish function
-        BLOCK_SUPERCONTEXT(function_block.get_tree()) = fndecl;
-        DECL_INITIAL(fndecl) = function_block.get_tree();
-        DECL_SAVED_TREE(fndecl) = function_body_scope.bind_expr.get_tree();
+                    tree self_parm_decl = build_decl (BUILTINS_LOCATION, PARM_DECL,
+                                                      get_identifier (it->argname.c_str()),
+                                                      integer_type_node);
+                    // printf("%s - 2 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    DECL_CONTEXT (self_parm_decl) = fndecl;
+                    // printf("%s - 3 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    DECL_ARG_TYPE (self_parm_decl) = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
+                    // printf("%s - 4 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    TREE_READONLY (self_parm_decl) = 1;
+                    // printf("%s - 5 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    thereareargs[i] = chainon (thereareargs[i], self_parm_decl);
+                    // printf("%s - 6 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    TREE_USED (self_parm_decl) = 1;
+                    // printf("%s - 7 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    // DECL_ARGUMENTS (fndecl) = thereareargs[i];
+                    // printf("%s - 8 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                    i++;
+            }
+        }
 
-        DECL_EXTERNAL(fndecl) = 0;
+        tree block = function_body_scope.bind_expr.get_tree();
+
+
+
+        // get_current_expr_list().append(block);
+
+        // DECL_INITIAL(fndecl) = block;
+
+        tree bl = function_block.get_tree();
+        BLOCK_SUPERCONTEXT(bl) = fndecl;
+        DECL_INITIAL(fndecl) = bl;
+        BLOCK_VARS(bl) = NULL_TREE;
+        TREE_USED(bl) = 1;
+        tree bind = build3(BIND_EXPR, void_type_node, BLOCK_VARS(bl),
+                           NULL_TREE, bl);
+        TREE_SIDE_EFFECTS(bind) = 1;
+
+        BIND_EXPR_BODY(bind) = block;
+        // block = bind;
+        DECL_SAVED_TREE(fndecl) = block;
+         // bind;
         DECL_PRESERVE_P(fndecl) = 1;
-
-        // Convert from GENERIC to GIMPLE
+        // printf("%s - 10\n", funcname->get_str().c_str());
         gimplify_function_tree(fndecl);
-
         // Insert it into the graph
-        cgraph_node::add_new_function(fndecl, false);
+        // cgraph_node::add_new_function(fndecl, false);
         cgraph_node::finalize_function(fndecl, true);
+        // printf("%s - FINISH\n", funcname->get_str().c_str());
 
-        fndecl = NULL_TREE;
-
-        return fndecl;
+        // tree stmt
+        //         = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
+        //                                block, foosize, thereareargs);
+        // Tree function
+    	// 	= build1 (ADDR_EXPR, build_pointer_type (fn_type), fndecl);
+        return NULL_TREE;
 }
 
 

@@ -23,6 +23,7 @@ namespace Ptiger {
         struct arg{
             tree arg_type;
             tree expr;
+            std::string argname;
         };
 
         // Func(FuncKind kind, const std::string &name_, tree ret_type, std::list<struct arg> argslist, location_t locus) : kind(kind), name(name_), ret_type(ret_type), argslist(argslist), locus(locus), body(error_mark_node) {
