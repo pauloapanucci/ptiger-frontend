@@ -188,7 +188,7 @@ public:
 
         Tree parse_field_declaration(std::vector <std::string> &field_names);
 
-        Tree parse_assignment_expression_declaration(Tree var, const_TokenPtr assig_tok);
+        Tree parse_assignment_expression_declaration(Tree var, const_TokenPtr assig_tok, bool isImplicit, Tree implicitExp);
 
         Tree parse_assignment_expression();
 
@@ -573,7 +573,7 @@ Tree Parser::parse_assignment_expression(){
         return assig_expr;
 }
 
-Tree Parser::parse_assignment_expression_declaration(Tree var, const_TokenPtr assig_tok) {
+Tree Parser::parse_assignment_expression_declaration(Tree var, const_TokenPtr assig_tok, bool isImplicit, Tree implicitExp) {
         // assignment_statement -> expression ":=" expression ";"
         Tree variable = parse_expression_naming_variable_declaration(var);
 
@@ -586,7 +586,11 @@ Tree Parser::parse_assignment_expression_declaration(Tree var, const_TokenPtr as
         // }
 
         const_TokenPtr first_of_expr = lexer.peek_token();
-        Tree expr = parse_exp();
+        Tree expr;
+        if(!isImplicit)
+                expr = parse_exp();
+        else
+                expr = implicitExp;
         if (expr.is_error())
                 return Tree::error();
         // skip_token(Ptiger::SEMICOLON);
@@ -620,22 +624,36 @@ Tree Parser::parse_variable_declaration() {
                 return Tree::error();
         }
 
-
-        // const_TokenPtr t = lexer.peek_token();
-        // if (t->get_id() == Ptiger::COLON){
-        //   Tree type_tree = parse_type();
-        //   if (type_tree.is_error()) {
-        //       skip_after_semicolon();
-        //       return Tree::error();
-        //   }
-        // }
-        if (!skip_token(Ptiger::COLON)) {
-                skip_after_end();
-                return Tree::error();
+        Tree type_tree;
+        Tree implicitExp;
+        bool isImplicit = false;
+        const_TokenPtr t = lexer.peek_token();
+        if (t->get_id() == Ptiger::COLON) {
+                lexer.skip_token();
+                implicitExp = NULL_TREE;
+                type_tree = parse_type();
+                if (type_tree.is_error()) {
+                        skip_after_semicolon();
+                        return Tree::error();
+                }
         }
+        else if (t->get_id() == Ptiger::ASSIGN) {
+            isImplicit = true;
+            lexer.skip_token();
+            implicitExp = parse_exp();
+            type_tree = implicitExp.get_type();
+            if (type_tree.is_error()) {
+                    skip_after_semicolon();
+                    return Tree::error();
+            }
+        }
+        // if (!skip_token(Ptiger::COLON)) {
+        //         skip_after_end();
+        //         return Tree::error();
+        // }
 
 
-        Tree type_tree = parse_type();
+        // Tree type_tree = parse_type();
 
         if (type_tree.is_error()) {
                 skip_after_end();
@@ -671,20 +689,15 @@ Tree Parser::parse_variable_declaration() {
         Tree expr = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
         get_current_expr_list().append(expr);
 
-        // const_TokenPtr t = lexer.peek_token();
-        // if (t->get_id() == Ptiger::ASSIGN){
-        //   skip_token(Ptiger::ASSIGN);
-        //   Tree assign_tree = parse_assignment_expression_declaration(decl, t);
-        //   if (assign_tree.is_error()) {
-        //       skip_after_semicolon();
-        //       return Tree::error();
-        //   }
-        // }
 
         const_TokenPtr assig_tok = lexer.peek_token();
-        skip_token(Ptiger::ASSIGN);
-        // const_TokenPtr literal = lexer.peek_token();
-        Tree assign_tree = parse_assignment_expression_declaration(decl, assig_tok);
+        if(!isImplicit) skip_token(Ptiger::ASSIGN);
+
+        Tree assign_tree;
+        if(isImplicit)
+            assign_tree = parse_assignment_expression_declaration(decl, assig_tok, true, implicitExp);
+        else
+            assign_tree = parse_assignment_expression_declaration(decl, assig_tok, false, NULL_TREE);
 
         if (assign_tree.is_error()) {
                 skip_after_semicolon();
@@ -1272,38 +1285,38 @@ Tree Parser::parse_function_declaration(){
                 get_current_expr_list().append(return_expr);
         }
         else {
-            tree result_decl = build_decl (BUILTINS_LOCATION, RESULT_DECL, NULL_TREE, return_type);
-            DECL_RESULT (fndecl) = result_decl;
+                tree result_decl = build_decl (BUILTINS_LOCATION, RESULT_DECL, NULL_TREE, return_type);
+                DECL_RESULT (fndecl) = result_decl;
         }
         // printf("%s - 7\n", funcname->get_str().c_str());
 
         SET_DECL_ASSEMBLER_NAME (fndecl, ident);
         // printf("%s - 8\n", funcname->get_str().c_str());
         if(foosize != 0) {
-            int i = 0;
-            for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it) {
-                    // args[i] = it->arg_type;
-                    // printf("HALLO WIE GEHTS?\n");
-                    // printf("%s - 1 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                int i = 0;
+                for (std::list<Ptiger::Func::arg>::iterator it = argslist.begin(); it != argslist.end(); ++it) {
+                        // args[i] = it->arg_type;
+                        // printf("HALLO WIE GEHTS?\n");
+                        // printf("%s - 1 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
 
-                    tree self_parm_decl = build_decl (BUILTINS_LOCATION, PARM_DECL,
-                                                      get_identifier (it->argname.c_str()),
-                                                      integer_type_node);
-                    // printf("%s - 2 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    DECL_CONTEXT (self_parm_decl) = fndecl;
-                    // printf("%s - 3 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    DECL_ARG_TYPE (self_parm_decl) = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
-                    // printf("%s - 4 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    TREE_READONLY (self_parm_decl) = 1;
-                    // printf("%s - 5 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    thereareargs[i] = chainon (thereareargs[i], self_parm_decl);
-                    // printf("%s - 6 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    TREE_USED (self_parm_decl) = 1;
-                    // printf("%s - 7 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    // DECL_ARGUMENTS (fndecl) = thereareargs[i];
-                    // printf("%s - 8 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
-                    i++;
-            }
+                        tree self_parm_decl = build_decl (BUILTINS_LOCATION, PARM_DECL,
+                                                          get_identifier (it->argname.c_str()),
+                                                          integer_type_node);
+                        // printf("%s - 2 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        DECL_CONTEXT (self_parm_decl) = fndecl;
+                        // printf("%s - 3 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        DECL_ARG_TYPE (self_parm_decl) = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
+                        // printf("%s - 4 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        TREE_READONLY (self_parm_decl) = 1;
+                        // printf("%s - 5 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        thereareargs[i] = chainon (thereareargs[i], self_parm_decl);
+                        // printf("%s - 6 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        TREE_USED (self_parm_decl) = 1;
+                        // printf("%s - 7 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        // DECL_ARGUMENTS (fndecl) = thereareargs[i];
+                        // printf("%s - 8 - PARAM <%s>\n", funcname->get_str().c_str(), it->argname.c_str());
+                        i++;
+                }
         }
 
         tree block = function_body_scope.bind_expr.get_tree();
@@ -1326,7 +1339,7 @@ Tree Parser::parse_function_declaration(){
         BIND_EXPR_BODY(bind) = block;
         // block = bind;
         DECL_SAVED_TREE(fndecl) = block;
-         // bind;
+        // bind;
         DECL_PRESERVE_P(fndecl) = 1;
         // printf("%s - 10\n", funcname->get_str().c_str());
         gimplify_function_tree(fndecl);
@@ -1339,7 +1352,7 @@ Tree Parser::parse_function_declaration(){
         //         = build_call_array_loc(first_of_expr->get_locus(), integer_type_node,
         //                                block, foosize, thereareargs);
         // Tree function
-    	// 	= build1 (ADDR_EXPR, build_pointer_type (fn_type), fndecl);
+        //  = build1 (ADDR_EXPR, build_pointer_type (fn_type), fndecl);
         return NULL_TREE;
 }
 
