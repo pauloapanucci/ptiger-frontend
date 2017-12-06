@@ -10,7 +10,11 @@ namespace Ptiger {
 
     void
     SymbolMapping::insert(SymbolPtr s) {
-        gcc_assert(s != NULL);
+        if(s != NULL)
+            if(s->get_kind() != Ptiger::FORVARIABLE)
+                gcc_assert(true);
+        // gcc_assert(s != NULL && s->get_kind() != Ptiger::FORVARIABLE);
+        if(s != NULL && s->get_kind() == Ptiger::FORVARIABLE) map.erase(s->get_name().c_str());
         std::pair<Map::iterator, bool> p
                 = map.insert(std::make_pair(s->get_name(), s));
 

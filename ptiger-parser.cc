@@ -431,7 +431,6 @@ void Parser::parse_declaration_seq(bool (Parser::*done)()) {
                 Tree decl = parse_declaration();
                 get_current_expr_list().append(decl);
         }
-        printf("Sai da decl seq\n");
 }
 
 void Parser::enter_scope() {
@@ -583,7 +582,6 @@ Tree Parser::parse_type_array(){
                 }
                 dimensions.push_back (std::make_pair (lower_bound, upper_bound));
                 t = lexer.peek_token ();
-                if(t->get_id() == Ptiger::IN) printf("Eu to com o IN\n");
         }
 
         for (Dimensions::reverse_iterator it = dimensions.rbegin (); it != dimensions.rend (); it++) {
@@ -602,9 +600,7 @@ Tree Parser::parse_type_array(){
 
 Tree Parser::parse_assignment_expression(){
         // assignment_statement -> expression ":=" expression ";"
-        printf("To parsando um assignment 0\n");
         Tree variable = parse_lhs_assignment_expression ();
-        printf("To parsando um assignment 1\n");
 
         if (variable.is_error ())
                 return Tree::error ();
@@ -694,13 +690,13 @@ Tree Parser::parse_variable_declaration() {
         if (t->get_id() == Ptiger::COLON) {
                 lexer.skip_token();
 
-
                 // if(symbol->get_kind() == Ptiger::TYPERECORD) {
                 //
                 // }
                 // else {
                 implicitExp = NULL_TREE;
                 type_tree = parse_type();
+                printf("DEBUG-1\n");
                 if (type_tree.is_error()) {
                         skip_after_semicolon();
                         return Tree::error();
@@ -712,9 +708,7 @@ Tree Parser::parse_variable_declaration() {
                 t = lexer.peek_token();
                 if(t->get_id() == Ptiger::IDENTIFIER) {
                         isNormalVar = false;
-                        printf("VOU PARSAR UM ARRAY\n");
                         type_tree = parse_type_array();
-                        printf("PARSEI UM ARRAY\n");
                 }
 
                 else{
@@ -740,24 +734,24 @@ Tree Parser::parse_variable_declaration() {
                 skip_after_end();
                 return Tree::error();
         }
-
+        printf("DEBUG-2\n");
         if (scope.get_current_mapping().get(identifier->get_str())) {
                 error_at(identifier->get_locus(),
                          "name '%s' already declared in this scope",
                          identifier->get_str().c_str());
         }
-
+        printf("DEBUG-3\n");
         SymbolPtr sym(new Symbol(Ptiger::VARIABLE, identifier->get_str()));
         scope.get_current_mapping().insert(sym);
-
+        printf("DEBUG-4\n");
         Tree decl = build_decl(identifier->get_locus(), VAR_DECL,
                                get_identifier(sym->get_name().c_str()),
                                type_tree.get_tree());
         DECL_CONTEXT(decl.get_tree()) = main_fndecl;
-
+        printf("DEBUG-5\n");
         gcc_assert(!stack_var_decl_chain.empty());
         stack_var_decl_chain.back().append(decl);
-
+        printf("DEBUG-6\n");
         sym->set_tree_decl(decl);
 
 
@@ -768,28 +762,28 @@ Tree Parser::parse_variable_declaration() {
 
 
         Tree expr = build_tree(DECL_EXPR, identifier->get_locus(), void_type_node, decl);
-
+        printf("DEBUG-7\n");
 
         const_TokenPtr assig_tok = lexer.peek_token();
 
-        if(!isNormalVar){
-            printf("Retornando build var array\n");
-            return expr;
+        if(!isNormalVar) {
+                return expr;
         }
-
+        printf("DEBUG-8\n");
         if(!isImplicit) skip_token(Ptiger::ASSIGN);
+        printf("DEBUG-9\n");
         get_current_expr_list().append(expr);
         Tree assign_tree;
         if(isImplicit)
                 assign_tree = parse_assignment_expression_declaration(decl, assig_tok, true, implicitExp);
         else
                 assign_tree = parse_assignment_expression_declaration(decl, assig_tok, false, NULL_TREE);
-
+        printf("DEBUG-10\n");
         if (assign_tree.is_error()) {
                 skip_after_semicolon();
                 return Tree::error();
         }
-
+        printf("DEBUG-11\n");
         return assign_tree;
 }
 
@@ -961,7 +955,6 @@ Tree Parser::parse_type_declaration (){
                                 sym->set_tree_decl (decl);
 
                                 Tree stmt = build_tree (DECL_EXPR, identifier->get_locus (), void_type_node, decl);
-                                printf("BUILDEY ARRAYI DECL\n");
                                 return stmt;
                         }
                         else if(t->get_id() == Ptiger::REAL) {
@@ -1025,6 +1018,7 @@ Tree Parser::parse_type_declaration (){
         // Tree stmt = build_tree (DECL_EXPR, identifier->get_locus (), void_type_node, decl);
         // return stmt;
 }
+
 
 void Parser::insert_external_library_functions(){
 
@@ -1438,13 +1432,14 @@ Tree Parser::parse_function_call(FuncPtr func){
                 return Tree::error();
         } else if(foo1 != 0) {
                 // printf(" foo1 -> %d | foo2 -> %d\n", foo1, foo2);
-                for (std::list<Ptiger::Func::arg>::iterator it1 = funcall_argslist.begin(), it2 = func->get_argslist().begin();
-                     it1 != funcall_argslist.end(), it2 != func->get_argslist().end();
-                     ++it1, ++it2) {
+                std::list<Ptiger::Func::arg>::iterator it1 = funcall_argslist.begin(), it2 = func->get_argslist().begin();
+                for (int i = 0; i < foo2; i++) {
                         if(it1->arg_type != it2->arg_type) {
                                 error_at(funcname->get_locus(), "expecting another type of argument");
                                 return Tree::error();
                         }
+                        it1++;
+                        it2++;
                 }
         }
         if (!skip_token(Ptiger::RPAREN)) {
@@ -1461,10 +1456,12 @@ Tree Parser::parse_function_call(FuncPtr func){
         else{
                 tree args[foo2];
                 // tree args[1] = {integer_type_node};
-                int i = 0;
-                for (std::list<Ptiger::Func::arg>::iterator it = func->get_argslist().begin(); it != func->get_argslist().end(); ++it) {
+                // int i = 0;
+                std::list<Ptiger::Func::arg>::iterator it = func->get_argslist().begin();
+                for (int i = 0; i < foo2; i++) {
                         args[i] = it->arg_type;
-                        i++;
+                        it++;
+                        // i++;
                 }
                 fncall_type = build_varargs_function_type_array(func->get_ret_type(), foo2, args);
                 // fncall_type = build_varargs_function_type_array(func->get_ret_type(), 1, args);
@@ -1484,13 +1481,12 @@ Tree Parser::parse_function_call(FuncPtr func){
         else{
                 tree args[foo2];
                 // args[0] = arg.get_tree();
-                int i = 0;
-                for (std::list<Ptiger::Func::arg>::iterator it = funcall_argslist.begin(); it != funcall_argslist.end(); ++it) {
-                        // args[i] = it->expr;
+                std::list<Ptiger::Func::arg>::iterator it = funcall_argslist.begin();
+                for (int i = 0; i < foo2; i++) {
                         args[i] = it->expr;
-                        i++;
+                        it++;
+                        // i++;
                 }
-
                 expr = build_call_array_loc(funcname->get_locus(), func->get_ret_type(), fn.get_tree(), foo2, args);
                 // expr = build_call_array_loc(first_of_expr->get_locus(), func->get_ret_type(), fn.get_tree(), 1, args);
         }
@@ -1827,6 +1823,15 @@ Tree Parser::parse_type() {
                 lexer.skip_token();
                 type = float_type_node;
                 break;
+        case Ptiger::STRING:
+                lexer.skip_token();
+                type = build_pointer_type(
+                        build_qualified_type(char_type_node,
+                                             TYPE_QUAL_CONST));
+                if(type.get_tree_code() == POINTER_TYPE
+                   && TYPE_MAIN_VARIANT(TREE_TYPE(type.get_tree())) == char_type_node)
+                        printf("Parsei um string node\n");
+                break;
         // case Ptiger::BOOL:
         //     lexer.skip_token();
         //     type = boolean_type_node;
@@ -1928,7 +1933,8 @@ SymbolPtr Parser::query_variable(const std::string &name, location_t loc) {
         if (sym == NULL) {
                 error_at(loc, "variable '%s' not declared in the current scope",
                          name.c_str());
-        } else if (sym->get_kind() != Ptiger::VARIABLE) {
+        } else if (sym->get_kind() != Ptiger::VARIABLE
+                   && sym->get_kind() != Ptiger::FORVARIABLE) {
                 error_at(loc, "name '%s' is not a variable", name.c_str());
                 sym = SymbolPtr();
         }
@@ -2066,13 +2072,11 @@ Tree Parser::parse_let_expression() {
                 return Tree::error ();
         }
 
-        printf("TO PARSANDO UM LET\n");
 
         enter_scope();
         parse_declaration_seq(&Parser::done_in);
 
         skip_token (Ptiger::IN);
-        printf("TO PARSANDO UM IN\n");
 
         parse_expression_seq(&Parser::done_let);
 
@@ -2228,17 +2232,27 @@ Tree Parser::parse_for_declaration_expression(const_TokenPtr identifier) {
         //       return Tree::error();
         // }
 
+
+
+
+        std::string name;
+        // if(idsym->get_kind() != NULL) printf("teste de sanidade 1\n");
+        // if(idsym->get_kind() != Ptiger::FORVARIABLE) printf("teste de sanidade 2\n");
         if (scope.get_current_mapping().get(identifier->get_str())) {
-                error_at(identifier->get_locus(),
-                         "name '%s' already declared in this scope",
-                         identifier->get_str().c_str());
+                SymbolPtr idsym = scope.lookup(identifier->get_str());
+                if(idsym->get_kind() != NULL && idsym->get_kind() != Ptiger::FORVARIABLE) {
+                        error_at(identifier->get_locus(),
+                                 "name '%s' already declared in this scope",
+                                 identifier->get_str().c_str());
+                }
         }
 
-        SymbolPtr sym(new Symbol(Ptiger::VARIABLE, identifier->get_str()));
+
+        SymbolPtr sym(new Symbol(Ptiger::FORVARIABLE, identifier->get_str()));
         scope.get_current_mapping().insert(sym);
 
         Tree decl = build_decl(identifier->get_locus(), VAR_DECL,
-                               get_identifier(sym->get_name().c_str()),
+                               get_identifier(identifier->get_str().c_str()),
                                type_tree.get_tree());
         DECL_CONTEXT(decl.get_tree()) = main_fndecl;
 
@@ -2290,7 +2304,7 @@ Tree Parser::parse_for_expression() {
                 skip_after_end();
                 return Tree::error();
         }
-
+        enter_scope();
         Tree upper_bound = parse_integer_expression();
 
         if (!skip_token(Ptiger::DO)) {
@@ -2298,7 +2312,7 @@ Tree Parser::parse_for_expression() {
                 return Tree::error();
         }
 
-        enter_scope();
+        // enter_scope();
         parse_expression_parenthesis_seq(&Parser::done_parenthesis);
 
         TreeSymbolMapping for_body_tree_scope = leave_scope();
