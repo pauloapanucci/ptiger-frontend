@@ -1,8 +1,14 @@
 /*este/*é um */teste*/
 let
-	var x : int  := 10
+	var x : int  := 0
     var y := 2.5
+	type myArray = array of int
+	var arr := myArray[16]
 in
 	print_integer(x);
+	for i := 0 to 15 do (
+arr[i] := i;
+		print_integer(arr[i]);
+	);
     write y;
 end

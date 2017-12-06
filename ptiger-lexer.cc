@@ -233,16 +233,16 @@ namespace Ptiger {
                     break;
                 case '[':
                     current_column++;
-                    return Token::make(LBRACE, loc);
+                    return Token::make(LBRACK, loc);
                 case ']':
                     current_column++;
-                    return Token::make(RBRACE, loc);
+                    return Token::make(RBRACK, loc);
                 case '{':
                     current_column++;
-                    return Token::make(LBRACK, loc);
+                    return Token::make(LBRACE, loc);
                 case '}':
                     current_column++;
-                    return Token::make(RBRACK, loc);
+                    return Token::make(RBRACE, loc);
                 case '.':
                     if (!ISDIGIT(peek_input())) {
                         // Only if followed by a non number
