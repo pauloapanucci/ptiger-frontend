@@ -1,18 +1,1 @@
-/*este/*é um */teste*/
-let
-	var x : int  := 0
-    var y := 2.5
-	var alo : string := "oi"
-	type myArray = array of int
-	var arr := myArray[16]
-in
-	write alo;
-	for i := 0 to 15 do (
-		arr[i] := i;
-		print_integer(arr[i]);
-	);
-	for i := 0 to 10 do (
-		print_integer(222);
-	);
-    write y;
-end
+

@@ -104,7 +104,7 @@ namespace Ptiger {
                     continue;
                 case '\t' /*|| '\v' || '\r'*/:
                     // depend on tab configuration
-                    current_column += 2;
+                    current_column += 1;
                     continue;
                     //PUNCT
                 case ':':
