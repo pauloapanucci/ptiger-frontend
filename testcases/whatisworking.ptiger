@@ -27,6 +27,15 @@ let
     type myRecord = {i: int, r: real, s: string}
     var rec : myRecord := {rec.i := 1, rec.r := 1.5, rec.s := "campo string de rec"}
 
+    function fooexample() = (
+        print_string("Este e um exemplo de funcao..."); println();
+        print_string("Devido a problemas, não se consegue linkar o corpo de expressoes internas do tiger ao corpo de uma funcao, porem consegue-se chamar funcoes externas..."); println();
+        print_string("Exemplo: chamando a funcao print_hello_ptiger():"); println();
+        print_hello_ptiger(); println();
+        print_string("Exemplo: printando um inteiro com print_integer():"); println();
+        print_integer(10); println();
+    )
+
 in
 
     /*Mostrando a parte de declarações implícitas e explícitas*/
@@ -91,6 +100,8 @@ in
     print_string("rec:"); println();
     print_string("rec.i: "); print_integer(rec.i); println();
     print_string("rec.r: "); print_real(rec.r); println();
-    print_string("rec.s: "); print_string(rec.s); println();
-    
+    print_string("rec.s: "); print_string(rec.s); println(); println();
+
+    fooexample()
+
 end
