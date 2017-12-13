@@ -1,6 +1,6 @@
 let
     /*Declarações implícitas e explícitas*/
-    var intImplicito := 1
+    var intImplicito := 5
     var intExplicito : int := 2
 
     var realImplicito := 1.5
@@ -102,6 +102,28 @@ in
     print_string("rec.r: "); print_real(rec.r); println();
     print_string("rec.s: "); print_string(rec.s); println(); println();
 
-    fooexample()
+    fooexample(); println();
+
+    print_string("Mostrando a parte do WHILE (contador de 5 a 1):");  println();
+    while intImplicito <> 0 do (
+        print_integer(intImplicito); print_string(" ");
+        intImplicito := intImplicito - 1
+    );
+    println(); println();
+
+    print_string("Mostrando a parte do IF"); println();
+    if intImplicito = 0 then print_string("Entrei na condicao do THEN do IF");
+
+    if intImplicito <> 0 then
+        print_string("Entrei na condicao do THEN do IF 2")
+    else (
+        print_string("Entrei na condicao do ELSE do IF 2");
+        println();
+        /*exemplo de expressoes aninhadas no corpo do else (pode ocorrer no corpo do if)*/
+        intImplicito := intImplicito + 2;
+        intImplicito := intImplicito * 2 + 1;
+        print_string("exemplo de sequencia de expressoes dentro do corpo do else"); println();
+        print_integer(intImplicito);
+    );
 
 end
