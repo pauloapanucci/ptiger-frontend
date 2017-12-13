@@ -1,0 +1,89 @@
+let
+    var x := 0
+    var y := 0
+    var rest := 0
+    var m := 0
+    var size := 20
+    var mod := 0
+
+    type myArray = array of real
+    var I := myArray[20][20]
+    var aux := myArray[20][20]
+
+in
+
+    /*Matrix Initialization*/
+    for i := 0 to size-1 do (
+        for j := 0 to i do (
+            /*a % b = a - (b * int(a/b))*/
+            x := 0-j;
+            y := 20;
+            m := x / y;
+            rest := m * y;
+            mod := x - rest;
+            I[i][j] := mod * 1.0;
+            I[i][j] := I[i][j] / y;
+            I[i][j] := I[i][j] + 1
+        );
+        for k := i+1 to size-1 do (
+            I[i][k] := 0.0;
+        );
+        I[i][i] := 1.0
+    );
+
+
+    for r := 0 to size-1 do (
+        for s := 0 to size-1 do (
+            aux[r][s] := 0.0
+        );
+    );
+
+    for t := 0 to size-1 do(
+        for r := 0 to size-1 do (
+            for s := 0 to size-1 do (
+                aux[r][s] := aux[r][s] + I[r][t] * I[s][t]
+            );
+        );
+    );
+
+    for r := 0 to size-1 do (
+        for s := 0 to size-1 do (
+            I[r][s] := aux[r][s]
+        );
+    );
+    /*END Matrix Initialization*/
+
+    print_string("Input Matrix:"); println();
+    /* Print Triangular Matrix */
+    for i := 0 to size-1 do (
+        for j := 0 to i do (
+            print_real(I[i][j]);
+            print_string(" ")
+        );
+        println();
+    );
+    println();
+
+    /*BEGIN KERNEL LU*/
+    for k := 0 to size-1 do (
+        for j := k+1 to size-1 do (
+            I[k][j] := I[k][j] / I[k][k];
+        );
+        for i := k+1 to size-1 do (
+            for j := k+1 to size-1 do (
+                I[i][j] := I[i][j] - I[i][k] * I[k][j];
+            );
+        );
+    );
+    /*END KERNEL LU*/
+
+    print_string("Output Matrix:"); println();
+    /* Print Triangular Matrix */
+    for i := 0 to size-1 do (
+        for j := 0 to i do (
+            print_real(I[i][j]);
+            print_string(" ")
+        );
+        println();
+    );
+end

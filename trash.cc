@@ -126,3 +126,57 @@ Tree Parser::parse_type_declaration (){
         expr = build_tree (DECL_EXPR, identifier->get_locus (), void_type_node, decl);
         return expr;
 }
+
+
+/*for (i = 0; i < size; i++){
+    aux[i] = (double*)malloc(size * sizeof(double));
+    for (j = 0; j <= i; j++){
+      m[i][j] = (double)(-j % size) / size + 1;
+    }
+    for (j = i+1; j < size; j++) {
+      m[i][j] = 0;
+    }
+    m[i][i] = 1;
+  }
+
+  /* Make the matrix positive semi-definite. */
+  int r,s,t;
+
+  for (r = 0; r < size; ++r)
+    for (s = 0; s < size; ++s)
+      aux[r][s] = 0;
+  for (t = 0; t < size; ++t)
+    for (r = 0; r < size; ++r)
+      for (s = 0; s < size; ++s)
+        aux[r][s] += m[r][t] * m[s][t];
+  for (r = 0; r < size; ++r)
+    for (s = 0; s < size; ++s){
+      m[r][s] = aux[r][s];
+    }
+
+    function modulus(x,y){
+    var m = Math.floor(x / y);
+    var r = m * y;
+    return x - r;
+
+    for (i = 0; i < n; i++)
+        for (j = 0; j <= i; j++) {
+            if ((i * n + j) % 20 == 0) printf("\n");
+            printf("%.2f ",m[i][j]);
+        }
+
+        for i := 0 to size-1 do (
+            for j := 0 to size-1 do (
+                x := i * n + j;
+                y := size;
+                m := x / y;
+                r := m * y;
+                mod := x - r;
+                if mod = 0 then println();
+                print_real(I[i][j]);
+            );
+            println();
+        );
+}
+
+*/

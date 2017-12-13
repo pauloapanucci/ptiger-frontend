@@ -1,1 +1,19 @@
+let
+    var x := 0.0
+    var y := 0.0
+in
+    x := 30.0;
+    y := 2.0;
+    print_real(x/y);
+    println();
 
+    x := 31.0;
+    y := 2.0;
+    print_real(x/y);
+    println();
+
+    x := 33.6;
+    y := 2.0;
+    print_real(0-x/y);
+    println();
+end

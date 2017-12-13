@@ -54,7 +54,7 @@ void print_string(char *s) {
 }
 
 void print_real(float n) {
-    printf("%f", n);
+    printf("%.2f", n);
 }
 
 void println() {

@@ -7,5 +7,9 @@ gccptiger -L../../ -o z.out z.ptiger -lptiger && ./z.out
 
 gccptiger -L../../ -o mm.out mm.ptiger -lptiger && ./mm.out
 
+export DYLD_LIBRARY_PATH=../../ && export LD_LIBRARY_PATH=../../
+gccptiger -L../../ -o ludec.out ludec.ptiger -lptiger && ./ludec.out
 
-gccptiger -L../../ -o cholesky.out cholesky.ptiger -lptiger && ./cholesky.out
+
+export DYLD_LIBRARY_PATH=../../ && export LD_LIBRARY_PATH=../../
+gccptiger -L../../ -o z.out z.ptiger -lptiger && ./z.out
