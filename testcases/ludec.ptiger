@@ -7,8 +7,8 @@ let
     var mod := 0
 
     type myArray = array of real
-    var I := myArray[size][size]
-    var aux := myArray[size][size]
+    var I := myArray[20][20]
+    var aux := myArray[20][20]
 
 in
 
