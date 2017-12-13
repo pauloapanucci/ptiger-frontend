@@ -1,4 +1,0 @@
-var x: int := 10
-write x
-x := 10
-if x < 10 then write x else write x+5

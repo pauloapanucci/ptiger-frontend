@@ -1,3 +1,0 @@
-var x : int := 10
-x := 11
-write x

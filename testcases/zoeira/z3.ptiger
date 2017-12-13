@@ -1,8 +1,0 @@
-let
-	var x: int := 1
-	var y: real := 2.3
-	var z: int := 5
-in
-	for i := 1 to 5 do write x;
-	while z <> 0 do (write y; z := z-1;)
-end

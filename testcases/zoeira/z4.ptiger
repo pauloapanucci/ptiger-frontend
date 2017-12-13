@@ -1,5 +1,0 @@
-let 
-	function foo() = write 10
-in
-	write 4
-end

@@ -1,6 +1,0 @@
-let 
-	var x : int := 9
-	var y : real := 8.745
-in
-	if x > 9 then write x; write x+1
-end

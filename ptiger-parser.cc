@@ -574,7 +574,7 @@ Tree Parser::parse_type_array(){
                 Tree lower_bound, upper_bound;
                 if (t->get_id () == Ptiger::LBRACK) {
                         Tree size = parse_integer_expression ();
-
+                        // Tree size = parse_expression ();
                         skip_token (Ptiger::RBRACK);
                         lower_bound = Tree (build_int_cst_type (integer_type_node, 0), size.get_locus ());
                         upper_bound = build_tree (MINUS_EXPR, size.get_locus (), integer_type_node, size, build_int_cst (integer_type_node, 1));
