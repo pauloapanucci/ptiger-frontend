@@ -1,0 +1,96 @@
+let
+    /*Declarações implícitas e explícitas*/
+    var intImplicito := 1
+    var intExplicito : int := 2
+
+    var realImplicito := 1.5
+    var realExplicito : real := 2.5
+
+    var stringImplicita := "String Implicita"
+    var stringExplicita : string := "String Explicita"
+
+    /*Declarações de tipo*/
+    type myInt : int
+    type myReal : real
+    type myString : string
+    var tipoInt : myInt := 10
+    var tipoReal : myReal := 10.5
+    var tipoString : myString := "Tipo String"
+
+    type myArrayi = array of int
+    type myArrayr = array of real
+    var arrayi := myArrayi[4]
+    var arrayr := myArrayr[4]
+    var matrixi := myArrayi[4][4]
+    var matrixr := myArrayr[4][4]
+
+    type myRecord = {i: int, r: real, s: string}
+    var rec : myRecord := {rec.i := 1, rec.r := 1.5, rec.s := "campo string de rec"}
+
+in
+
+    /*Mostrando a parte de declarações implícitas e explícitas*/
+    print_string("Mostrando a parte de declaracoes implicitas e explicitas"); println();
+    print_string("Inteiros: "); print_integer(intImplicito); print_string("(implicito) ");
+        print_integer(intExplicito); print_string("(explicito)"); println();
+
+    print_string("Reais: "); print_real(realImplicito); print_string("(implicito) ");
+        print_real(realExplicito); print_string("(explicito)"); println();
+
+    print_string("String: "); print_string(stringImplicita); print_string("(implicito) ");
+        print_string(stringExplicita); print_string("(explicito)"); println();
+    println();
+
+    /*Mostrando a parte de declarações de tipo*/
+    print_string("Mostrando a parte de declaracoes de tipo"); println();
+    print_string("Tipo inteiro: "); print_integer(tipoInt); println();
+    print_string("Tipo real: "); print_real(tipoReal); println();
+    print_string("Tipo string: "); print_string(tipoString); println();
+    println();
+
+    for i := 0 to 3 do (
+        arrayi[i] := 1;
+        arrayr[i] := 1.33;
+        for j := 0 to 3 do (
+            matrixi[i][j] := 2;
+            matrixr[i][j] := 2.33;
+        );
+    );
+
+    /*Printando arrays, matrizes e record*/
+    print_string("arrayi:"); println();
+    for i := 0 to 3 do (
+        print_integer(arrayi[i]);
+        print_string(" ");
+    );
+    println(); println();
+    print_string("arrayr:"); println();
+    for i := 0 to 3 do (
+        print_real(arrayr[i]);
+        print_string(" ");
+    );
+    println(); println();
+    print_string("matrixi:"); println();
+    for i := 0 to 3 do (
+        for j := 0 to 3 do (
+            print_integer(matrixi[i][j]);
+            print_string(" ");
+        );
+        println();
+    );
+    println();
+    print_string("matrixr:"); println();
+    for i := 0 to 3 do (
+        for j := 0 to 3 do (
+            print_real(matrixr[i][j]);
+            print_string(" ");
+        );
+        println();
+    );
+    println();
+    print_string("rec:"); println();
+    print_string("rec.i: "); print_integer(rec.i); println();
+    print_string("rec.r: "); print_real(rec.r); println();
+    print_string("rec.s: "); print_string(rec.s); println();
+    
+end

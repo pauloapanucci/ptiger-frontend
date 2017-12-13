@@ -19,5 +19,8 @@ ludec:
 mm:
 	$(PTIGERCC) -L../ -o mm.out mm.ptiger -lptiger
 
+working:
+	$(PTIGERCC) -L../ -o whatisworking.out whatisworking.ptiger -lptiger
+
 clean:
 	rm *.out ../*.so
