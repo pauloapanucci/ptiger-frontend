@@ -1,3 +1,5 @@
+/* Programa em Tiger contendo uma multiplicação de matrizes 4x4 simples - Escrito por Paulo Alexandre Panucci */
+
 let
 
     type myArray = array of int

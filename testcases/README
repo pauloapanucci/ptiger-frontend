@@ -1,0 +1,7 @@
+# COMO RODAR OS TESTCASES
+    - Para compilar a multiplicação de matrizes, na pasta dos testcases execute $ make mm e depois $ ./mm.out
+    - Para compilar a decomposição lu, na pasta dos testcases execute $ make ludec e depois $ ./ludec.out
+    - Para compilar os exemplos de funcionalidade, na pasta dos testcases execute $ make working e depois $ ./whatisworking.out
+
+# COMO COMPILAR A BIBLIOTECA DINAMICA
+    - Para compilar a biblioteca dinamica, na pasta dos testcases execute $ make lib

@@ -1,3 +1,5 @@
+/* Programa em Tiger contendo exemplos das funcionalidades implementadas - Escrito por Paulo Alexandre Panucci */
+
 let
     /*Declarações implícitas e explícitas*/
     var intImplicito := 5
